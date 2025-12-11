@@ -1,0 +1,7 @@
+#!/bin/bash
+
+[ -f "Caskfile" ] || (echo "No Caskfile found" 1>&2 && exit -1)
+while read line
+do
+  [ "${line###*}" ] && brew $line 2>/dev/null
+done < Caskfile

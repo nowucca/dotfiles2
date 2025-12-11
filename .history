@@ -1,0 +1,67 @@
+function histinit() {
+	#
+	# From https://superuser.com/questions/211966/how-do-i-keep-my-bash-history-across-sessions
+	#
+	HISTFOLDER=~/.bash_histories
+
+	# Increase Bash history size. Allow 32³ entries; the default is 500.
+	export HISTSIZE='32768';
+	export HISTFILESIZE="${HISTSIZE}";
+	# Omit duplicates and commands that begin with a space from history.
+	export HISTCONTROL='ignoreboth';
+
+
+	# only files in $HISTFOLDER with this extension will be read
+	export HISTFILEEXT=history
+	shopt -s histappend   # append when closing session
+	mkdir -p $HISTFOLDER
+
+	# create unique file name for this session.
+	# Nanoseconds seems to be unique enough, try:
+	# for ((i=0; i<=10; i++)); do date +%Y-%m-%d_%H-%M-%S_%N; done
+	# No nanoseconds on redhat so leaving as seconds.
+	# if HISTFILE unset, history is not saved on exit ->
+	# not really necessary if we save after each command, but its a double net safety
+	export HISTFILE=$HISTFOLDER/$(date +%Y-%m-%d_%H-%M-%S).$HISTFILEEXT
+
+	# maximum number of commands to hold inside bash history buffer
+	export HISTSIZE=-1
+
+	# maximum number of lines in history file
+	export HISTFILESIZE=-1
+	# history -a $HISTFILE
+	# bash saves the total history commands entered since startup or since the last save and saves that amount of commands to the file. This means reading a history file after typing commands will trip up bash, but this won't be a problem if the history file is only loaded in the beginning. This means that only new commands are saved not all the old loaded commands, thereby we can load as many history files into the buffer as we want and still only save newly thereafter typed commands
+	# This command is executed after very typed command ->
+	# save history after each command instead after only closing the session
+	#export PROMPT_COMMAND="history -a $HISTFILE; $PROMPT_COMMAND"
+	if [[ "$PROMPT_COMMAND" != *"history -a $HISTFILE"* ]]; then
+  	  export PROMPT_COMMAND="history -a $HISTFILE${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+	fi
+
+	# Load old histories from last 5 files/sessions
+	HISTLINESTOLOAD=2000
+	# --reverse lists newest files at first
+	names=($(ls -r $HISTFOLDER/*.$HISTFILEEXT | head -5 2>/dev/null))
+	toload=()
+	linecount=0
+	# Check if is really file and count lines and only append to $toload if linecount under $HISTLINESTOLOAD
+	for fname in ${names[*]}; do
+		#echo "Looking at history file ${fname}"
+		if test -f $fname; then
+			linecount=$((linecount+$(wc -l < $fname) ))
+			if test $linecount -ge $HISTLINESTOLOAD; then
+				break
+			fi
+			toload+=($fname)
+		fi
+	done
+
+	# Beginning with the oldest load files in $toload into bash history buffer
+	for (( i=${#toload[*]}-1; i>=0; i-- )); do
+		# echo "Loading bash history from ${toload[$i]}"
+		history -r ${toload[$i]}
+	done
+}
+
+unset PROMPT_COMMAND
+histinit

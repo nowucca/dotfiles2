@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# Install SDKMAN! with the following snippet:
+[[ -r ${HOME}/.sdkman ]] || curl -s "https://get.sdkman.io" | bash
+source "${HOME}/.sdkman/bin/sdkman-init.sh"
+
+# /opt/nflx
+if is_mac; then
+    export PATH=/opt/nflx:/opt/nflx/bin:$PATH
+fi
+
+alias todo="gvim ~/drive/todo"
+alias nf="gvim ~/drive/todo-netflix.md"
+
+alias awsdbtest_asapp="weep file --force arn:aws:iam::179727101194:role/platformserviceInstanceProfile -A arn:aws:iam::521597827845:role/PlatformserviceDynamodbRole"
+alias awsdbprod_asapp="weep file --force arn:aws:iam::149510111645:role/platformserviceInstanceProfile -A arn:aws:iam::567395257996:role/PlatformserviceDynamodbRole"
+
+# If running weep serve
+export AWS_CONTAINER_CREDENTIALS_FULL_URI='http://localhost:9091/ecs/arn:aws:iam::567395257996:role/awsmanagement_dynamic_config_mgt'
+alias awsdbtest="weep file arn:aws:iam::179727101194:role/platformserviceInstanceProfile -A arn:aws:iam::521597827845:role/PlatformserviceDynamodbRole"
+alias awsdbprod="weep file arn:aws:iam::149510111645:role/platformserviceInstanceProfile -A arn:aws:iam::567395257996:role/PlatformserviceDynamodbRole"
+alias awsdbtestdirect="weep file --force arn:aws:iam::521597827845:role/awsmanagementtest_dynamic_config_mgt"
+alias awsdbproddirect="weep file --force arn:aws:iam::567395257996:role/awsmanagement_dynamic_config_mgt"
+alias awstest="weep --force file arn:aws:iam::179727101194:role/nsacRole"
+alias weepls="alias awsdbtest awsdbprod awstest awsdeleng"
+
+export NETFLIX_DEV=true
+
+# For subscriberservice2
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+
+if [ -r ${HOME}/.gitconfig-netflix ]
+then
+    grep metatron ${HOME}/.gitconfig >/dev/null 2>&1
+    if [ "$?" != 0 ]
+    then
+        cat ${HOME}/.gitconfig-netflix >> ${HOME}/.gitconfig
+        cat ${HOME}/.gitconfig-netflix-ghes >> ${HOME}/.gitconfig
+    fi
+fi
+
+# Establish my git credentials for Netflix by default
+git config --global user.email 'satkinson@netflix.com'
+git config --global user.name  'Steven Atkinson'
+git config --global push.autoSetupRemote true
+
+# NVM
+export NVM_DIR="$HOME/.nvm"
+[ ! -d "$NVM_DIR" ] && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/refs/heads/master/install.sh | bash
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/nvm.sh" ] && nvm use 18 >/dev/null 2>&1  # This loads nvm using node 18
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+
+if is_mac; then
+				#Delivery Engineering
+
+				# kubectl
+				[[ ":$PATH:" != *":$HOME/.kube/bin:"* ]] && export PATH="$HOME/.kube/bin:${PATH}"
+				[[ ":$PATH:" != *":$HOME/.kube/bin:"* ]] && export PATH="$HOME/.kube/bin:${PATH}"
+
+				source $HOME/.spinnaker-env.sh
+
+				alias llm='/Users/satkinson/.llm-netflix/env/bin/llm'
+				alias bot='/Users/satkinson/.llm-netflix/env/bin/llm netflix'
+fi
+
+# Alias to configure and start the aiproxy
+# Function to configure the aiproxy
+configure_aiproxy() {
+    cat << EOF > /tmp/proxy-config.yaml
+apiVersion: "v1"
+spec:
+  meshServers:
+    - name: foo
+      config:
+        localTargets:
+          - name: lo_egress
+            httpWorkload:
+              port: 2002
+              requestTimeoutMs: 0
+        listeners:
+        - name: strip_auth
+          port: 7002
+          handlers:
+            - http:
+                security:
+                  plaintext: {}
+                headers:
+                  requestHeadersToRemove:
+                    - "Authorization"
+                defaultRoute:
+                  localTargetName: lo_egress
+EOF
+}
+
+# Alias to configure and start the aiproxy
+alias start-aiproxy='configure_aiproxy && newt --app-type mesh start -e prod -s /tmp/proxy-config.yaml'
+
+function setup_cline() {
+    # Ensure VPN and Docker are running
+    echo "Please ensure your VPN is connected and Docker is running."
+
+    # Check for Model Gateway project ID
+    if [ -z "$1" ]; then
+        echo "Model Gateway project ID is required."
+        echo "Please visit https://go.netflix.com/modelgateway to create a project ID."
+        return 1
+    fi
+
+    # Assign the provided project ID to a variable
+    MODEL_GATEWAY_PROJECT_ID="$1"
+
+    # Create the configuration file
+    echo "Creating proxy configuration file..."
+    cat << EOF > /tmp/proxy-config.yaml
+apiVersion: "v1"
+spec:
+  meshServers:
+    - name: foo
+      config:
+        localTargets:
+          - name: lo_egress
+            httpWorkload:
+              port: 2002
+              requestTimeoutMs: 0
+        listeners:
+        - name: strip_auth
+          port: 7002
+          handlers:
+            - http:
+                security:
+                  plaintext: {}
+                headers:
+                  requestHeadersToRemove:
+                    - "Authorization"
+                defaultRoute:
+                  localTargetName: lo_egress
+EOF
+
+    # Start the proxy
+    echo "Starting the proxy..."
+    newt --app-type mesh start -e prod -s /tmp/proxy-config.yaml
+
+    # Test the connection
+    echo "Testing the connection..."
+    curl -vvv http://copilotdppython-secure.us-east-1.prod.svip.mesh.netflix.net:7002/proxy/$MODEL_GATEWAY_PROJECT_ID/v1/chat/completions \
+        -H "content-type: application/json" \
+        -d '{"model": "gpt-4o", "messages": [{"content": "foo", "role": "user"}]}'
+
+    echo "\n\nSetup complete. Please configure the Cline extension in your IDE as per the instructions at https://go.netflix.com/cline"
+}
+
+alias listmodels='metatron curl -a copilotcp ''https://copilotcp.cluster.us-east-1.prod.cloud.netflix.net:8443/models/list_models?includeHidden=false'' | jq ''.models[].id'''
+
+function models() {
+  metatron curl -a copilotcp 'https://copilotcp.vip.us-east-1.prod.cloud.netflix.net:8443/models/list_models' \
+    -H 'accept: application/json' | \
+    jq -r '.models[] | .id + " (context size: " + (.contextSize | tostring) + ")"'
+}
