@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Reset all network services on macOS
+# Requires sudo
+
+echo "Resetting all network services…"
+
+# Disable all network services
+while IFS= read -r service; do
+    echo "Disabling: $service"
+    sudo networksetup -setnetworkserviceenabled "$service" off
+done < <(networksetup -listallnetworkservices | tail -n +2)
+
+# Enable them again
+while IFS= read -r service; do
+    echo "Enabling: $service"
+    sudo networksetup -setnetworkserviceenabled "$service" on
+done < <(networksetup -listallnetworkservices | tail -n +2)
+
+echo "FLushing DNS caches…"
+sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
+echo "Done."

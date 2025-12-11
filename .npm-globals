@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# # Global npm packages management
+# # Add packages to this file and they will be installed/updated on shell startup
+
+# # Function to check if npm package is globally installed
+# npm_package_installed() {
+#     npm list -g "$1" >/dev/null 2>&1
+# }
+
+# # Function to install npm package globally if not installed
+# ensure_npm_package() {
+#     if ! npm_package_installed "$1"; then
+#         npm install -g "$1" >/dev/null 2>&1
+#     fi
+# }
+
+# # List of global npm packages to maintain
+# ensure_npm_package "@mermaid-js/mermaid-cli"

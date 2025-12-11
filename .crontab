@@ -1,0 +1,14 @@
+#!/bin/bash
+USER=${USER}
+EXISTING_CRONTAB_CONTENTS=$(crontab -l)
+CRONTAB=$(which crontab)
+
+if [[ "$EXISTING_CRONTAB_CONTENTS" =~ "brew update" ]]; then
+   echo Brew update already in crontab, no action performed.
+   exit 0
+else
+   ${CRONTAB} -r -u ${USER}
+   echo MAILTO=""
+   echo "PATH=/usr/local/bin:/usr/bin:/bin:/etc:/usr/local/sbin:/usr/sbin:/sbin:."
+   echo "* 1 * * * /usr/local/bin/brew update >> /var/log/crontab_satkinson.log 2>&1 "
+fi
