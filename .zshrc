@@ -65,6 +65,13 @@ if is_mac; then
   fi
 fi
 
+# Use emacs key bindings for command line editing
+bindkey -e
+
+# Explicitly bind Ctrl-A and Ctrl-E for beginning/end of line
+bindkey '^A' beginning-of-line
+bindkey '^E' end-of-line
+
 # Case-insensitive globbing (used in pathname expansion)
 setopt NO_CASE_GLOB
 

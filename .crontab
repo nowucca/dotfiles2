@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 USER=${USER}
 EXISTING_CRONTAB_CONTENTS=$(crontab -l)
 CRONTAB=$(which crontab)
