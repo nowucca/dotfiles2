@@ -3,7 +3,6 @@
 #
 # Note:
 #  install brew
-#  install oh-my-zsh (optional): sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 #  then run bootstrap.sh
 #
 # to kickstart this dotfiles process on a new machine
@@ -26,10 +25,15 @@ is_mac() {
 # Add `~/bin` to the `$PATH`
 export PATH="$HOME/bin:$PATH";
 if is_mac; then
-    # Set PATH, MANPATH, etc., for Homebrew.
-    export PATH="/opt/homebrew/sbin:$PATH"
-    export PATH="/opt/homebrew/bin:$PATH";
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    # Set PATH, MANPATH, etc., for Homebrew (cached for performance)
+    # This replaces slow `eval "$(brew shellenv)"` with hardcoded values
+    # If you reinstall Homebrew to a different location, update these paths
+    export HOMEBREW_PREFIX="/opt/homebrew"
+    export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
+    export HOMEBREW_REPOSITORY="/opt/homebrew"
+    export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+    export MANPATH="/opt/homebrew/share/man${MANPATH+:$MANPATH}:"
+    export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
 fi
 
 # init z https://github.com/rupa/z
@@ -52,16 +56,18 @@ GTK_PATH=/usr/local/lib/gtk-2.0
 
 # zsh completions
 if is_mac; then
-  # Enable zsh completion system
-  autoload -Uz compinit
-  compinit
-
-  # Load homebrew's zsh completions
+  # Load homebrew's zsh completions first (before compinit)
   if type brew &>/dev/null; then
     FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
-    # Re-initialize completion after adding to FPATH
-    autoload -Uz compinit
+  fi
+
+  # Enable zsh completion system with caching (only once!)
+  # Regenerate cache only once per day for better performance
+  autoload -Uz compinit
+  if [[ -n ${ZDOTDIR}/.zcompdump(#qN.mh+24) ]]; then
     compinit
+  else
+    compinit -C
   fi
 fi
 
@@ -85,8 +91,8 @@ setopt CORRECT_ALL
 setopt EXTENDED_GLOB
 setopt GLOB_STAR_SHORT
 
-# Add tab completion for SSH hostnames based on ~/.ssh/config, ignoring wildcards
-[ -e "$HOME/.ssh/config" ] && complete -o "default" -o "nospace" -W "$(grep "^Host" ~/.ssh/config | grep -v "[?*]" | cut -d " " -f2- | tr ' ' '\n')" scp sftp ssh ssh_screen;
+# SSH completion is handled by zsh's built-in completion system (via compinit)
+# The bash 'complete' builtin doesn't work in zsh, so the old line has been removed
 
 ###################################
 # STTY Settings                   #

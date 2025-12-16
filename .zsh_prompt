@@ -30,13 +30,27 @@ prompt_git() {
 		git rev-parse --short HEAD 2> /dev/null || \
 		echo '(unknown)')";
 
-	# Early exit for Chromium & Blink repo, as the dirty check takes too long.
-	# Thanks, @paulirish!
-	# https://github.com/paulirish/dotfiles/blob/dd33151f/.bash_prompt#L110-L123
+	# Fast mode for large repos where dirty checks are too slow
+	# Checks for: Chromium, Netflix repos, or any repo > 100MB
 	repoUrl="$(git config --get remote.origin.url)";
-	if grep -q 'chromium/src.git' <<< "${repoUrl}"; then
-		s+='*';
+	local use_fast_mode=0
+
+	# Check if it's a known large repo
+	if grep -qE '(chromium/src\.git|github\.com[:/]Netflix|stash\.corp\.netflix\.com|code\.corp\.netflix\.com)' <<< "${repoUrl}"; then
+		use_fast_mode=1
 	else
+		# Check repo size - if .git dir is > 100MB, use fast mode
+		local git_dir_size=$(du -sm "$(git rev-parse --git-dir)" 2>/dev/null | cut -f1)
+		if [[ -n "$git_dir_size" ]] && (( git_dir_size > 100 )); then
+			use_fast_mode=1
+		fi
+	fi
+
+	if (( use_fast_mode )); then
+		# Fast mode: just show branch and a marker indicating fast mode
+		s+='⚡';
+	else
+		# Full mode: detailed status checks for small repos
 		# Check for uncommitted changes in the index.
 		if ! $(git diff --quiet --ignore-submodules --cached); then
 			s+='+';
