@@ -303,3 +303,4 @@ alias tsc='npx tsc --noEmit --project packages/app/tsconfig.json'
 alias alacritty='/Applications/Alacritty.app/Contents/MacOS/alacritty &'
 
 alias clauded='claude --dangerously-skip-permissions'
+alias claudedr='claude --dangerously-skip-permissions --resume'
