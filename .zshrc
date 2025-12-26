@@ -56,6 +56,9 @@ GTK_PATH=/usr/local/lib/gtk-2.0
 
 # zsh completions
 if is_mac; then
+  # Add local completion scripts to FPATH
+  fpath=(~/.local/share/zsh/site-functions $fpath)
+
   # Load homebrew's zsh completions first (before compinit)
   if type brew &>/dev/null; then
     FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
@@ -106,7 +109,3 @@ fi
 # ixon (-ixon) Enable (disable) START/STOP output control
 # Output is stopped by sending STOP control character and
 # started by sending the START control character.
-
-# Completion scripts
-fpath=(~/.local/share/zsh/site-functions $fpath)
-autoload -Uz compinit && compinit
