@@ -251,10 +251,11 @@ alias sie='ls -Fla'
 ##
 ## Edit and reload aliases for these dotfiles
 ##
-alias zz='vi ~/dotfiles/nowucca/dotfiles/.zshrc'
-alias dotf="cd ~/dotfiles/nowucca/dotfiles"
+alias rz='. ~/.zshrc'
+alias zz='vi ~/Work/dotfiles/.zshrc'
+alias dotf="cd ~/Work/dotfiles"
 alias dotsync="sync-dotfiles.sh"
-
+alias dotb="cd ~/Work/dotfiles; . ./bootstrap.sh -f"
 ##
 ## Old tools aliases
 ##

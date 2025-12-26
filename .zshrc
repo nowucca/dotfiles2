@@ -106,3 +106,7 @@ fi
 # ixon (-ixon) Enable (disable) START/STOP output control
 # Output is stopped by sending STOP control character and
 # started by sending the START control character.
+
+# Completion scripts
+fpath=(~/.local/share/zsh/site-functions $fpath)
+autoload -Uz compinit && compinit
