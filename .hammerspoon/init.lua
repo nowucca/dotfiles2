@@ -69,7 +69,7 @@ function ws.set(text)
   notes[key] = text
   saveNotes(notes)
 
-  hs.alert.show("Space note saved")
+  hs.alert.show("Space note saved: " .. text)
 end
 
 function ws.rebind()
@@ -93,7 +93,7 @@ function ws.rebind()
     notes[newKey] = notes[choice.key]
     saveNotes(notes)
 
-    hs.alert.show("Space note rebound")
+    hs.alert.show("Space note rebound: " .. notes[newKey])
   end):choices(choices):show()
 end
 
