@@ -222,11 +222,27 @@ function ws.buildMenu()
     end
   end
 
-  if #uniqueLabels > 0 then
-    table.insert(menu, { title = "-" })
-    table.insert(menu, { title = "Apply Existing Label:", disabled = true })
+  -- Sort alphabetically (case-insensitive)
+  table.sort(uniqueLabels, function(a, b)
+    return string.lower(a) < string.lower(b)
+  end)
 
-    for _, labelName in ipairs(uniqueLabels) do
+  -- Limit to 20 labels max
+  local maxLabels = 20
+  local displayLabels = {}
+  for i = 1, math.min(#uniqueLabels, maxLabels) do
+    table.insert(displayLabels, uniqueLabels[i])
+  end
+
+  if #displayLabels > 0 then
+    table.insert(menu, { title = "-" })
+    local headerText = "Apply Existing Label:"
+    if #uniqueLabels > maxLabels then
+      headerText = headerText .. " (showing " .. maxLabels .. " of " .. #uniqueLabels .. ")"
+    end
+    table.insert(menu, { title = headerText, disabled = true })
+
+    for _, labelName in ipairs(displayLabels) do
       local isCurrent = (labelName == currentLabel)
       table.insert(menu, {
         title = (isCurrent and "→ " or "   ") .. labelName,
