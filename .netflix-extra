@@ -13,7 +13,7 @@ sdk() {
 
 # /opt/nflx
 if is_mac; then
-    export PATH=/opt/nflx:/opt/nflx/bin:$PATH
+    export PATH=$PATH:/opt/nflx:/opt/nflx/bin
 fi
 
 alias todo="gvim ~/drive/todo"
