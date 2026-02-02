@@ -305,3 +305,5 @@ alias alacritty='/Applications/Alacritty.app/Contents/MacOS/alacritty &'
 
 alias clauded='claude --dangerously-skip-permissions'
 alias claudedr='claude --dangerously-skip-permissions --resume'
+
+alias ghelogin='gh auth login -p https -h github.netflix.net'
