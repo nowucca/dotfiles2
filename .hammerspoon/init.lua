@@ -433,11 +433,15 @@ function ws.initMenubar()
     ws.menubar = nil
   end
 
-  ws.menubar = menubar.new()
+  -- Create menubar with autosave name for position persistence
+  ws.menubar = menubar.new(true, "SpaceLabels")
   if ws.menubar then
+    -- Higher priority = further right in menubar (closer to Control Center)
+    -- System items are around 1000+, setting higher pushes it right
+    ws.menubar:priority(9999)
     ws.menubar:setMenu(ws.buildMenu)
     ws.updateMenubar()
-    print("Menubar created")
+    print("Menubar created with priority 9999 (right position)")
   else
     print("ERROR: menubar.new() returned nil")
   end
