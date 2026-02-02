@@ -434,14 +434,12 @@ function ws.initMenubar()
   end
 
   -- Create menubar with autosave name for position persistence
+  -- Note: macOS controls menubar positioning. Cmd+drag to reposition manually.
   ws.menubar = menubar.new(true, "SpaceLabels")
   if ws.menubar then
-    -- Higher priority = further right in menubar (closer to Control Center)
-    -- System items are around 1000+, setting higher pushes it right
-    ws.menubar:priority(9999)
     ws.menubar:setMenu(ws.buildMenu)
     ws.updateMenubar()
-    print("Menubar created with priority 9999 (right position)")
+    print("Menubar created (Cmd+drag to reposition)")
   else
     print("ERROR: menubar.new() returned nil")
   end
