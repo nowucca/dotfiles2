@@ -199,5 +199,8 @@ brew install dependency-check
 # Google Builds
 brew install bazel
 
+# Graphite
+brew install withgraphite/tap/graphite
+
 # Remove outdated versions from the cellar.
 brew cleanup
