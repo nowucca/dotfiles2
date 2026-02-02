@@ -84,9 +84,8 @@ bindkey '^E' end-of-line
 # Case-insensitive globbing (used in pathname expansion)
 setopt NO_CASE_GLOB
 
-# Autocorrect typos in path names when using `cd`
+# Autocorrect typos in command names (not arguments)
 setopt CORRECT
-setopt CORRECT_ALL
 
 # Enable extended globbing
 # * `**/qux` will match `./foo/bar/baz/qux`
