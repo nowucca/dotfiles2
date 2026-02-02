@@ -460,6 +460,20 @@ ws.screenWatcher = screen.watcher.new(function()
 end)
 
 -- ============================================
+-- KEYBOARD SHORTCUTS
+-- ============================================
+
+-- Cmd+Ctrl+L - Show space label menu (works even if menubar icon is hidden)
+hs.hotkey.bind({"cmd", "ctrl"}, "L", function()
+  ws.promptForLabel()
+end)
+
+-- Cmd+Ctrl+Shift+L - Show current label as banner
+hs.hotkey.bind({"cmd", "ctrl", "shift"}, "L", function()
+  ws.show()
+end)
+
+-- ============================================
 -- INITIALIZATION
 -- ============================================
 
@@ -475,3 +489,4 @@ end)
 
 alert.show("Space Labels loaded! 🏷️")
 print("Space Labels script loaded successfully!")
+print("Shortcuts: Cmd+Ctrl+L (set label), Cmd+Ctrl+Shift+L (show label)")
