@@ -337,8 +337,13 @@ function ws.buildMenu()
 
   -- Actions
   table.insert(menu, {
-    title = "Set Label...",
+    title = "Set Label... (⌘⌃L)",
     fn = function() ws.promptForLabel() end
+  })
+
+  table.insert(menu, {
+    title = "Switch Space... (⌘⌃Space)",
+    fn = function() ws.showSpaceSwitcher() end
   })
 
   if currentLabel then
@@ -416,11 +421,7 @@ function ws.buildMenu()
 
   table.insert(menu, { title = "-" })
   table.insert(menu, {
-    title = "Switch Space... (⌘⌃Space)",
-    fn = function() ws.showSpaceSwitcher() end
-  })
-  table.insert(menu, {
-    title = "Show Banner",
+    title = "Show Banner (⌘⌃⇧L)",
     fn = function() ws.show() end
   })
   table.insert(menu, {
