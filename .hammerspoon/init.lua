@@ -416,6 +416,10 @@ function ws.buildMenu()
 
   table.insert(menu, { title = "-" })
   table.insert(menu, {
+    title = "Switch Space... (⌘⌃Space)",
+    fn = function() ws.showSpaceSwitcher() end
+  })
+  table.insert(menu, {
     title = "Show Banner",
     fn = function() ws.show() end
   })
@@ -460,6 +464,81 @@ ws.screenWatcher = screen.watcher.new(function()
 end)
 
 -- ============================================
+-- SPACE SWITCHING
+-- ============================================
+
+-- Get all spaces on the current screen with their labels
+function ws.getSpacesForCurrentScreen()
+  local win = window.focusedWindow()
+  local scr = win and win:screen() or screen.mainScreen()
+  if not scr then return {} end
+
+  local screenUUID = scr:getUUID()
+  local allSpaces = spaces.spacesForScreen(screenUUID) or {}
+  local activeSpaceId = spaces.activeSpaces()[screenUUID]
+  local data = loadData()
+  local result = {}
+
+  for i, spaceId in ipairs(allSpaces) do
+    local label = getLabelForSpace(data, tostring(spaceId))
+    local isActive = (spaceId == activeSpaceId)
+    table.insert(result, {
+      spaceId = spaceId,
+      index = i,
+      label = label,
+      isActive = isActive,
+      screenUUID = screenUUID
+    })
+  end
+
+  return result
+end
+
+-- Switch to a specific space
+function ws.gotoSpace(spaceId)
+  if not spaceId then return end
+  spaces.gotoSpace(spaceId)
+  -- Update menubar after a short delay for space change to complete
+  timer.doAfter(0.3, function()
+    ws.updateMenubar()
+  end)
+end
+
+-- Show space switcher chooser
+function ws.showSpaceSwitcher()
+  local spaceList = ws.getSpacesForCurrentScreen()
+  local choices = {}
+
+  for _, spaceInfo in ipairs(spaceList) do
+    local text = ""
+    local prefix = spaceInfo.isActive and "→ " or "   "
+
+    if spaceInfo.label then
+      text = prefix .. spaceInfo.label
+    else
+      text = prefix .. "Space " .. spaceInfo.index
+    end
+
+    table.insert(choices, {
+      text = text,
+      subText = "Space ID: " .. spaceInfo.spaceId .. (spaceInfo.isActive and " (current)" or ""),
+      spaceId = spaceInfo.spaceId,
+      index = spaceInfo.index
+    })
+  end
+
+  local ch = chooser.new(function(choice)
+    if not choice then return end
+    ws.gotoSpace(choice.spaceId)
+  end)
+
+  ch:choices(choices)
+  ch:placeholderText("Switch to space...")
+  ch:searchSubText(true)
+  ch:show()
+end
+
+-- ============================================
 -- KEYBOARD SHORTCUTS
 -- ============================================
 
@@ -471,6 +550,11 @@ end)
 -- Cmd+Ctrl+Shift+L - Show current label as banner
 hs.hotkey.bind({"cmd", "ctrl", "shift"}, "L", function()
   ws.show()
+end)
+
+-- Cmd+Ctrl+Space - Show space switcher (arrow keys + enter to switch)
+hs.hotkey.bind({"cmd", "ctrl"}, "space", function()
+  ws.showSpaceSwitcher()
 end)
 
 -- ============================================
