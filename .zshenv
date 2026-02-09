@@ -1,37 +1,41 @@
 # ~/.zshenv
-# Loaded for all zsh shells (login, interactive, non-interactive)
-# This is the place for environment variables
+# Loaded for ALL zsh shells (login, interactive, non-interactive, scripts)
+# Keep this minimal - only truly universal environment variables
+#
+# Note: This file is the SINGLE SOURCE OF TRUTH for environment variables
+# The old .exports file is now deprecated
 
-# Make vim the default editor.
-export EDITOR='vim';
+#=============================================================================
+# Editor
+#=============================================================================
+export EDITOR='vim'
 
-# Enable persistent REPL history for `node`.
-export NODE_REPL_HISTORY=~/.node_history;
-# Allow 32³ entries; the default is 1000.
-export NODE_REPL_HISTORY_SIZE='32768';
-# Use sloppy mode by default, matching web browsers.
-export NODE_REPL_MODE='sloppy';
+#=============================================================================
+# Language/Locale
+#=============================================================================
+export LANG='en_US.UTF-8'
+export LC_ALL='en_US.UTF-8'
 
-# Make Python use UTF-8 encoding for output to stdin, stdout, and stderr.
-export PYTHONIOENCODING='UTF-8';
+#=============================================================================
+# Node.js REPL
+#=============================================================================
+export NODE_REPL_HISTORY=~/.node_history
+export NODE_REPL_HISTORY_SIZE='32768'  # 32³ entries
+export NODE_REPL_MODE='sloppy'         # Match web browser behavior
 
-# Increase zsh history size. Allow 32³ entries; the default is 500.
-export HISTSIZE='32768';
-export SAVEHIST="${HISTSIZE}";
-export HISTFILE=~/.zsh_history;
-# Omit duplicates and commands that begin with a space from history.
-setopt HIST_IGNORE_ALL_DUPS
-setopt HIST_IGNORE_SPACE
-setopt HIST_SAVE_NO_DUPS
-setopt SHARE_HISTORY
+#=============================================================================
+# Python
+#=============================================================================
+export PYTHONIOENCODING='UTF-8'
 
-# Prefer US English and use UTF-8.
-export LANG='en_US.UTF-8';
-export LC_ALL='en_US.UTF-8';
+#=============================================================================
+# Pager/Manual
+#=============================================================================
+export MANPAGER='less -X'  # Don't clear screen after quitting man
 
-# Don't clear the screen after quitting a manual page.
-export MANPAGER='less -X';
-
-# Avoid issues with `gpg` as installed via Homebrew.
+#=============================================================================
+# GPG
+#=============================================================================
+# Avoid issues with `gpg` as installed via Homebrew
 # https://stackoverflow.com/a/42265848/96656
-export GPG_TTY=$(tty);
+export GPG_TTY=$(tty)
