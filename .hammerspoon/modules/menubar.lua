@@ -16,6 +16,7 @@ local data = require("modules.data")
 local spaceLabels = nil
 local spaceSwitcher = nil
 local profiles = nil
+local appLauncher = nil
 
 -- Internal state
 M.widget = nil
@@ -138,6 +139,22 @@ function M.buildMenu()
     fn = function() if profiles then profiles.showDeleteChooser() end end
   })
 
+  -- App Launcher section
+  table.insert(menu, { title = "-" })
+  table.insert(menu, { title = "Open App Here:", disabled = true })
+  table.insert(menu, {
+    title = "🌐 Chrome (⌘⌃⇧C)",
+    fn = function() if appLauncher then appLauncher.openChrome() end end
+  })
+  table.insert(menu, {
+    title = "💻 iTerm (⌘⌃T)",
+    fn = function() if appLauncher then appLauncher.openITerm() end end
+  })
+  table.insert(menu, {
+    title = "Choose App... (⌘⌃N)",
+    fn = function() if appLauncher then appLauncher.showLauncher() end end
+  })
+
   table.insert(menu, { title = "-" })
   table.insert(menu, {
     title = "Show Banner (⌘⌃⇧L)",
@@ -156,6 +173,7 @@ function M.init(deps)
   spaceLabels = deps.spaceLabels
   spaceSwitcher = deps.spaceSwitcher
   profiles = deps.profiles
+  appLauncher = deps.appLauncher
 
   -- Create menubar widget
   if M.widget then

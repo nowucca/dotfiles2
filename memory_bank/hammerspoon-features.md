@@ -12,6 +12,9 @@ Hammerspoon provides macOS Space labeling, switching, and workspace profile mana
 | `⌘⌃Space` | Open space switcher |
 | `⌘⌃S` | Save current space as profile |
 | `⌘⌃R` | Restore profile to current space |
+| `⌘⌃N` | Open app on current space (chooser) |
+| `⌘⌃⇧C` | Open Chrome on current space |
+| `⌘⌃T` | Open iTerm on current space |
 
 ## Menubar Widget
 
@@ -92,6 +95,30 @@ Save and restore the set of apps on a space.
 - **iTerm**: Creates new window via AppleScript, moves to current space
   (This handles the case where iTerm is already open on another space)
 
+### App Launcher (Open on Current Space)
+Launch Chrome or iTerm windows that stay on the current space.
+
+**Problem Solved:**
+When you open a new Chrome or iTerm window and that app is already running on another space, macOS switches you to that space. The app launcher:
+1. Records your current space before launching
+2. Creates a new window
+3. Moves the new window to your original space
+4. Switches you back to the original space
+5. Focuses the new window
+
+**Usage:**
+- Press `⌘⌃N` to show chooser (Chrome or iTerm)
+- Press `⌘⌃⇧C` for Chrome directly
+- Press `⌘⌃T` for iTerm directly
+
+**How It Works:**
+1. Captures current space ID before any action
+2. Uses AppleScript to create new window (ensures new window, not focus)
+3. Polls for the new window to appear (up to 2 seconds)
+4. Moves new window to original space via hs.spaces.moveWindowToSpace
+5. Switches back to original space
+6. Focuses the new window
+
 ### Label Management
 
 **Prune Labels:**
@@ -136,6 +163,7 @@ ws.menubar.update()
 ~/Work/dotfiles/.hammerspoon/
 ├── init.lua
 └── modules/
+    ├── app-launcher.lua
     ├── data.lua
     ├── space-labels.lua
     ├── space-switcher.lua

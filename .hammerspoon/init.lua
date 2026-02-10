@@ -16,6 +16,7 @@ local spaceLabels = require("space-labels")
 local spaceSwitcher = require("space-switcher")
 local profiles = require("profiles")
 local menubar = require("menubar")
+local appLauncher = require("app-launcher")
 
 -- ============================================
 -- INITIALIZE
@@ -27,8 +28,14 @@ print("Hammerspoon loading...")
 menubar.init({
   spaceLabels = spaceLabels,
   spaceSwitcher = spaceSwitcher,
-  profiles = profiles
+  profiles = profiles,
+  appLauncher = appLauncher
 })
+
+-- Connect app launcher callback to refresh menubar after window launch
+appLauncher.onWindowLaunched = function()
+  menubar.update()
+end
 
 -- ============================================
 -- KEYBOARD SHORTCUTS
@@ -59,6 +66,21 @@ hs.hotkey.bind({"cmd", "ctrl"}, "R", function()
   profiles.showRestoreChooser()
 end)
 
+-- Cmd+Ctrl+N - Open new app on current space (shows chooser)
+hs.hotkey.bind({"cmd", "ctrl"}, "N", function()
+  appLauncher.showLauncher()
+end)
+
+-- Cmd+Ctrl+Shift+C - Open Chrome on current space
+hs.hotkey.bind({"cmd", "ctrl", "shift"}, "C", function()
+  appLauncher.openChrome()
+end)
+
+-- Cmd+Ctrl+T - Open iTerm on current space
+hs.hotkey.bind({"cmd", "ctrl"}, "T", function()
+  appLauncher.openITerm()
+end)
+
 -- ============================================
 -- GLOBAL ACCESS (for console debugging)
 -- ============================================
@@ -67,7 +89,8 @@ ws = {
   labels = spaceLabels,
   switcher = spaceSwitcher,
   profiles = profiles,
-  menubar = menubar
+  menubar = menubar,
+  launcher = appLauncher
 }
 
 -- ============================================
@@ -77,9 +100,12 @@ ws = {
 hs.alert.show("Hammerspoon loaded! 🏷️")
 print("Hammerspoon loaded successfully!")
 print("Shortcuts:")
-print("  Cmd+Ctrl+L       - Set label")
-print("  Cmd+Ctrl+Shift+L - Show label banner")
-print("  Cmd+Ctrl+Space   - Switch space")
-print("  Cmd+Ctrl+S       - Save space profile")
-print("  Cmd+Ctrl+R       - Restore profile")
-print("Modules: ws.labels, ws.switcher, ws.profiles, ws.menubar")
+print("  Cmd+Ctrl+L         - Set label")
+print("  Cmd+Ctrl+Shift+L   - Show label banner")
+print("  Cmd+Ctrl+Space     - Switch space")
+print("  Cmd+Ctrl+S         - Save space profile")
+print("  Cmd+Ctrl+R         - Restore profile")
+print("  Cmd+Ctrl+N         - Open app on current space (chooser)")
+print("  Cmd+Ctrl+Shift+C   - Open Chrome on current space")
+print("  Cmd+Ctrl+T         - Open iTerm on current space")
+print("Modules: ws.labels, ws.switcher, ws.profiles, ws.menubar, ws.launcher")

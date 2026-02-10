@@ -16,6 +16,42 @@ local fs = require("hs.fs")
 
 local dataPath = hs.configdir .. "/workspace-notes.json"
 
+-- Validate and clean the data structure to prevent corruption
+local function validateAndClean(data)
+  if not data then return { labels = {}, spaces = {} } end
+  
+  local cleanLabels = {}
+  local cleanSpaces = {}
+  
+  -- Clean labels: only keep entries that have proper { lastUsed: number } structure
+  if data.labels then
+    for key, value in pairs(data.labels) do
+      if type(value) == "table" and type(value.lastUsed) == "number" then
+        cleanLabels[key] = value
+      elseif type(value) == "string" and tonumber(key) then
+        -- This is a space->label mapping that got put in wrong section
+        cleanSpaces[key] = value
+      end
+    end
+  end
+  
+  -- Clean spaces: only keep entries that are spaceId -> labelName (string)
+  if data.spaces then
+    for key, value in pairs(data.spaces) do
+      if type(value) == "string" then
+        cleanSpaces[key] = value
+        -- Ensure the label exists in labels section
+        if not cleanLabels[value] then
+          cleanLabels[value] = { lastUsed = os.time() }
+        end
+      end
+      -- Skip entries where value is a table (those are misplaced label entries)
+    end
+  end
+  
+  return { labels = cleanLabels, spaces = cleanSpaces }
+end
+
 function M.load()
   if fs.attributes(dataPath) then
     local f = io.open(dataPath)
@@ -37,7 +73,8 @@ function M.load()
             end
           end
         end
-        return data
+        -- Always validate and clean the data
+        return validateAndClean(data)
       end
     end
   end
