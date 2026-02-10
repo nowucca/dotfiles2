@@ -17,6 +17,7 @@ local spaceSwitcher = require("space-switcher")
 local profiles = require("profiles")
 local menubar = require("menubar")
 local appLauncher = require("app-launcher")
+local spaceManager = require("space-manager")
 
 -- ============================================
 -- INITIALIZE
@@ -24,12 +25,19 @@ local appLauncher = require("app-launcher")
 
 print("Hammerspoon loading...")
 
+-- Initialize space manager with dependencies
+spaceManager.init({
+  spaceLabels = spaceLabels,
+  appLauncher = appLauncher
+})
+
 -- Initialize menubar with dependencies
 menubar.init({
   spaceLabels = spaceLabels,
   spaceSwitcher = spaceSwitcher,
   profiles = profiles,
-  appLauncher = appLauncher
+  appLauncher = appLauncher,
+  spaceManager = spaceManager
 })
 
 -- Connect app launcher callback to refresh menubar after window launch
@@ -81,6 +89,16 @@ hs.hotkey.bind({"cmd", "ctrl"}, "T", function()
   appLauncher.openITerm()
 end)
 
+-- Cmd+Ctrl+Shift+N - Create new space with iTerm + Chrome
+hs.hotkey.bind({"cmd", "ctrl", "shift"}, "N", function()
+  spaceManager.createNewSpace()
+end)
+
+-- Cmd+Ctrl+W - Close current space (with confirmation)
+hs.hotkey.bind({"cmd", "ctrl"}, "W", function()
+  spaceManager.confirmCloseCurrentSpace()
+end)
+
 -- ============================================
 -- GLOBAL ACCESS (for console debugging)
 -- ============================================
@@ -90,7 +108,8 @@ ws = {
   switcher = spaceSwitcher,
   profiles = profiles,
   menubar = menubar,
-  launcher = appLauncher
+  launcher = appLauncher,
+  manager = spaceManager
 }
 
 -- ============================================
@@ -108,4 +127,6 @@ print("  Cmd+Ctrl+R         - Restore profile")
 print("  Cmd+Ctrl+N         - Open app on current space (chooser)")
 print("  Cmd+Ctrl+Shift+C   - Open Chrome on current space")
 print("  Cmd+Ctrl+T         - Open iTerm on current space")
-print("Modules: ws.labels, ws.switcher, ws.profiles, ws.menubar, ws.launcher")
+print("  Cmd+Ctrl+Shift+N   - Create new space (iTerm + Chrome)")
+print("  Cmd+Ctrl+W         - Close current space")
+print("Modules: ws.labels, ws.switcher, ws.profiles, ws.menubar, ws.launcher, ws.manager")

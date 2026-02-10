@@ -17,6 +17,7 @@ local spaceLabels = nil
 local spaceSwitcher = nil
 local profiles = nil
 local appLauncher = nil
+local spaceManager = nil
 
 -- Internal state
 M.widget = nil
@@ -155,6 +156,18 @@ function M.buildMenu()
     fn = function() if appLauncher then appLauncher.showLauncher() end end
   })
 
+  -- Space Management section
+  table.insert(menu, { title = "-" })
+  table.insert(menu, { title = "Space Management:", disabled = true })
+  table.insert(menu, {
+    title = "✨ Create New Space (⌘⌃⇧N)",
+    fn = function() if spaceManager then spaceManager.createNewSpace() end end
+  })
+  table.insert(menu, {
+    title = "🗑️ Close This Space... (⌘⌃W)",
+    fn = function() if spaceManager then spaceManager.confirmCloseCurrentSpace() end end
+  })
+
   table.insert(menu, { title = "-" })
   table.insert(menu, {
     title = "Show Banner (⌘⌃⇧L)",
@@ -174,6 +187,7 @@ function M.init(deps)
   spaceSwitcher = deps.spaceSwitcher
   profiles = deps.profiles
   appLauncher = deps.appLauncher
+  spaceManager = deps.spaceManager
 
   -- Create menubar widget
   if M.widget then
