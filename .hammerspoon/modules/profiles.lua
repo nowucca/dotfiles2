@@ -41,6 +41,57 @@ local function getCurrentSpaceId()
   return spaces.activeSpaces()[uuid]
 end
 
+-- Get current space info including screen reference
+local function getCurrentSpaceInfo()
+  local win = window.focusedWindow()
+  local scr = win and win:screen() or screen.mainScreen()
+  if not scr then return nil, nil end
+  local uuid = scr:getUUID()
+  local spaceId = spaces.activeSpaces()[uuid]
+  return spaceId, scr
+end
+
+-- Move window to correct screen and space (handles multi-monitor)
+local function moveWindowToScreenAndSpace(win, targetScreen, targetSpaceId)
+  local winId = win:id()
+  local windowScreen = win:screen()
+  local targetScreenUUID = targetScreen:getUUID()
+  
+  -- If window is on different screen, move it to target screen first
+  if windowScreen and windowScreen:getUUID() ~= targetScreenUUID then
+    print("profiles: Window on different screen, moving to target screen first")
+    local targetFrame = targetScreen:frame()
+    win:setFrame(targetFrame)
+    
+    -- Wait for window to settle on new screen, then move to space
+    timer.doAfter(0.5, function()
+      local freshWin = window.get(winId)
+      if freshWin then
+        -- Go to target space first
+        spaces.gotoSpace(targetSpaceId)
+        
+        timer.doAfter(0.3, function()
+          -- Now move window to space
+          spaces.moveWindowToSpace(winId, targetSpaceId)
+          
+          timer.doAfter(0.2, function()
+            local finalWin = window.get(winId)
+            if finalWin then
+              finalWin:focus()
+            end
+          end)
+        end)
+      end
+    end)
+  else
+    -- Same screen, just move to space directly
+    spaces.moveWindowToSpace(winId, targetSpaceId)
+    timer.doAfter(0.2, function()
+      win:focus()
+    end)
+  end
+end
+
 -- ============================================
 -- SAVE CURRENT SPACE CONFIG
 -- ============================================
@@ -158,18 +209,27 @@ end
 
 -- Launch an app and move its new window to the current space
 -- This handles the case where the app is already running on another space
-function M.launchAppToCurrentSpace(appName, bundleID)
-  local spaceId = getCurrentSpaceId()
-  if not spaceId then 
-    print("profiles: No current space ID")
+-- Uses multi-monitor aware window movement
+function M.launchAppToCurrentSpace(appName, bundleID, targetSpaceId, targetScreen)
+  -- Use provided targets or get current space info
+  local spaceId, scr
+  if targetSpaceId and targetScreen then
+    spaceId = targetSpaceId
+    scr = targetScreen
+  else
+    spaceId, scr = getCurrentSpaceInfo()
+  end
+  
+  if not spaceId or not scr then 
+    print("profiles: No current space ID or screen")
     return 
   end
   
-  print("profiles: Launching " .. appName .. " (bundle: " .. tostring(bundleID) .. ")")
+  print("profiles: Launching " .. appName .. " (bundle: " .. tostring(bundleID) .. ") to space " .. tostring(spaceId) .. " on " .. scr:name())
   
-  -- Special handling for iTerm - create a new window via AppleScript
+  -- Special handling for iTerm - use keyboard simulation to preserve shell settings
   if appName == "iTerm2" or appName == "iTerm" then
-    M.createiTermWindowOnCurrentSpace(spaceId)
+    M.createiTermWindowOnCurrentSpace(spaceId, scr)
     return
   end
   
@@ -206,7 +266,7 @@ function M.launchAppToCurrentSpace(appName, bundleID)
   
   print("profiles: App launched/focused, waiting for windows...")
   
-  -- Wait for windows to appear, then move new ones to current space
+  -- Wait for windows to appear, then move new ones to current space (multi-monitor aware)
   timer.doAfter(2.0, function()
     local app = bundleID and application.get(bundleID) or application.get(appName)
     if app then
@@ -215,7 +275,7 @@ function M.launchAppToCurrentSpace(appName, bundleID)
         -- If this is a new window (wasn't there before), move it
         if not existingWindows[win:id()] and win:isStandard() then
           print("profiles: Moving window " .. tostring(win:id()) .. " to space " .. tostring(spaceId))
-          spaces.moveWindowToSpace(win, spaceId)
+          moveWindowToScreenAndSpace(win, scr, spaceId)
           moved = moved + 1
         end
       end
@@ -232,35 +292,72 @@ function M.launchAppToCurrentSpace(appName, bundleID)
   end)
 end
 
--- Create a new iTerm window on the current space
-function M.createiTermWindowOnCurrentSpace(spaceId)
-  local script = [[
-    tell application "iTerm"
-      create window with default profile
-    end tell
-  ]]
+-- Create a new iTerm window on the current space (multi-monitor aware)
+-- Uses keyboard simulation to preserve shell settings (colored prompt, etc.)
+function M.createiTermWindowOnCurrentSpace(spaceId, targetScreen)
+  -- Get existing windows before creating new one
+  local iterm = application.get("iTerm2") or application.get("iTerm")
+  local existingWindows = {}
   
-  local ok, err = hs.osascript.applescript(script)
-  if not ok then
-    alert.show("iTerm error: " .. tostring(err))
-    return
+  if iterm then
+    for _, win in ipairs(iterm:allWindows()) do
+      existingWindows[win:id()] = true
+    end
+    
+    -- Use keyboard simulation (preserves shell settings)
+    iterm:activate()
+    timer.doAfter(0.15, function()
+      hs.eventtap.keyStroke({"cmd"}, "n")
+      
+      -- Wait for window then move it
+      timer.doAfter(0.5, function()
+        M.findAndMoveNewWindow("iTerm2", existingWindows, spaceId, targetScreen, "iTerm")
+      end)
+    end)
+  else
+    -- iTerm not running, launch it
+    application.launchOrFocus("iTerm")
+    timer.doAfter(1.0, function()
+      M.findAndMoveNewWindow("iTerm2", existingWindows, spaceId, targetScreen, "iTerm")
+    end)
   end
+end
+
+-- Find a new window and move it to the target screen/space (multi-monitor aware)
+function M.findAndMoveNewWindow(appName, existingWindows, targetSpaceId, targetScreen, altAppName)
+  local attempts = 0
+  local maxAttempts = 30
   
-  -- Wait a moment then move the new window to current space
-  timer.doAfter(0.5, function()
-    local iterm = application.get("iTerm2") or application.get("iTerm")
-    if iterm then
-      -- The frontmost window is likely the new one
-      local win = iterm:focusedWindow()
-      if win then
-        spaces.moveWindowToSpace(win, spaceId)
-        -- Focus the window
-        timer.doAfter(0.3, function()
-          win:focus()
-        end)
+  local function checkAndMove()
+    attempts = attempts + 1
+    
+    local app = application.get(appName)
+    if not app and altAppName then
+      app = application.get(altAppName)
+    end
+    
+    if app then
+      for _, win in ipairs(app:allWindows()) do
+        if not existingWindows[win:id()] and win:isStandard() then
+          print("profiles: Found new window " .. tostring(win:id()) .. " after " .. attempts .. " attempts")
+          
+          -- Use multi-monitor aware movement
+          moveWindowToScreenAndSpace(win, targetScreen, targetSpaceId)
+          return  -- Done
+        end
       end
     end
-  end)
+    
+    if attempts < maxAttempts then
+      timer.doAfter(0.1, checkAndMove)
+    else
+      print("profiles: Could not find new window after " .. maxAttempts .. " attempts")
+      -- Still try to go to target space
+      spaces.gotoSpace(targetSpaceId)
+    end
+  end
+  
+  checkAndMove()
 end
 
 -- Restore a profile to the current space
@@ -281,18 +378,28 @@ function M.restoreProfile(profileName)
     return
   end
   
+  -- Capture target space/screen BEFORE any launches change focus
+  local targetSpaceId, targetScreen = getCurrentSpaceInfo()
+  if not targetSpaceId or not targetScreen then
+    alert.show("Cannot determine current space")
+    return
+  end
+  
+  print("profiles: Restoring profile '" .. profile.name .. "' to space " .. tostring(targetSpaceId) .. " on " .. targetScreen:name())
+  
   -- Apply label to current space if profile has one
   if profile.label then
     spaceLabels.set(profile.label)
   end
   
-  alert.show("Restoring: " .. profile.name)
+  alert.show("Restoring: " .. profile.name .. " (" .. #(profile.apps or {}) .. " apps)")
   
-  -- Launch each app
+  -- Launch each app, passing the captured target space/screen
   for i, appInfo in ipairs(profile.apps or {}) do
     -- Stagger launches to avoid overwhelming the system
-    timer.doAfter(i * 0.5, function()
-      M.launchAppToCurrentSpace(appInfo.name, appInfo.bundleID)
+    -- Use longer delay to account for multi-monitor window movement
+    timer.doAfter(i * 2.5, function()
+      M.launchAppToCurrentSpace(appInfo.name, appInfo.bundleID, targetSpaceId, targetScreen)
     end)
   end
 end
