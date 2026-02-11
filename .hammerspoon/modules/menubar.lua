@@ -52,7 +52,7 @@ function M.buildMenu()
 
   -- Actions
   table.insert(menu, {
-    title = "Set Label... (⌘⌃L)",
+    title = "Set Label... (⌘⌃⇧L)",
     fn = function() if spaceLabels then spaceLabels.promptForLabel() end end
   })
 
@@ -144,7 +144,7 @@ function M.buildMenu()
   table.insert(menu, { title = "-" })
   table.insert(menu, { title = "Open App Here:", disabled = true })
   table.insert(menu, {
-    title = "🌐 Chrome (⌘⌃⇧C)",
+    title = "🌐 Chrome (⌘⌃B)",
     fn = function() if appLauncher then appLauncher.openChrome() end end
   })
   table.insert(menu, {
@@ -160,17 +160,17 @@ function M.buildMenu()
   table.insert(menu, { title = "-" })
   table.insert(menu, { title = "Space Management:", disabled = true })
   table.insert(menu, {
-    title = "✨ Create New Space...",
+    title = "✨ Create New Space (⌘⌃⇧N)",
     fn = function() if spaceManager then spaceManager.createNewSpace() end end
   })
   table.insert(menu, {
-    title = "🗑️ Close This Space... (⌘⌃W)",
+    title = "🗑️ Close This Space (⌘⌃⇧C)",
     fn = function() if spaceManager then spaceManager.confirmCloseCurrentSpace() end end
   })
 
   table.insert(menu, { title = "-" })
   table.insert(menu, {
-    title = "Show Banner (⌘⌃⇧L)",
+    title = "Show Banner (⌘⌃L)",
     fn = function() if spaceLabels then spaceLabels.show() end end
   })
   table.insert(menu, {
