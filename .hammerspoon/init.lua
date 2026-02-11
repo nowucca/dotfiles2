@@ -49,14 +49,14 @@ end
 -- KEYBOARD SHORTCUTS
 -- ============================================
 
--- Cmd+Ctrl+L - Set space label
+-- Cmd+Ctrl+L - Show current label as banner
 hs.hotkey.bind({"cmd", "ctrl"}, "L", function()
-  spaceLabels.promptForLabel()
+  spaceLabels.show()
 end)
 
--- Cmd+Ctrl+Shift+L - Show current label as banner
+-- Cmd+Ctrl+Shift+L - Set space label (Shift = create/modify)
 hs.hotkey.bind({"cmd", "ctrl", "shift"}, "L", function()
-  spaceLabels.show()
+  spaceLabels.promptForLabel()
 end)
 
 -- Cmd+Ctrl+Space - Show space switcher
@@ -79,8 +79,8 @@ hs.hotkey.bind({"cmd", "ctrl"}, "N", function()
   appLauncher.showLauncher()
 end)
 
--- Cmd+Ctrl+Shift+C - Open Chrome on current space
-hs.hotkey.bind({"cmd", "ctrl", "shift"}, "C", function()
+-- Cmd+Ctrl+B - Open Browser (Chrome) on current space
+hs.hotkey.bind({"cmd", "ctrl"}, "B", function()
   appLauncher.openChrome()
 end)
 
@@ -94,8 +94,8 @@ hs.hotkey.bind({"cmd", "ctrl", "shift"}, "N", function()
   spaceManager.createNewSpace()
 end)
 
--- Cmd+Ctrl+W - Close current space (with confirmation)
-hs.hotkey.bind({"cmd", "ctrl"}, "W", function()
+-- Cmd+Ctrl+Shift+C - Close current space (Shift = major action, C = Close)
+hs.hotkey.bind({"cmd", "ctrl", "shift"}, "C", function()
   spaceManager.confirmCloseCurrentSpace()
 end)
 
@@ -119,14 +119,14 @@ ws = {
 hs.alert.show("Hammerspoon loaded! 🏷️")
 print("Hammerspoon loaded successfully!")
 print("Shortcuts:")
-print("  Cmd+Ctrl+L         - Set label")
-print("  Cmd+Ctrl+Shift+L   - Show label banner")
+print("  Cmd+Ctrl+L         - Show label banner")
+print("  Cmd+Ctrl+Shift+L   - Set label")
 print("  Cmd+Ctrl+Space     - Switch space")
 print("  Cmd+Ctrl+S         - Save space profile")
 print("  Cmd+Ctrl+R         - Restore profile")
-print("  Cmd+Ctrl+N         - Open app on current space (chooser)")
-print("  Cmd+Ctrl+Shift+C   - Open Chrome on current space")
-print("  Cmd+Ctrl+T         - Open iTerm on current space")
-print("  Cmd+Ctrl+Shift+N   - Create new space (iTerm + Chrome)")
-print("  Cmd+Ctrl+W         - Close current space")
+print("  Cmd+Ctrl+N         - Open app chooser")
+print("  Cmd+Ctrl+B         - Open Browser (Chrome)")
+print("  Cmd+Ctrl+T         - Open iTerm")
+print("  Cmd+Ctrl+Shift+N   - Create new space")
+print("  Cmd+Ctrl+Shift+C   - Close current space")
 print("Modules: ws.labels, ws.switcher, ws.profiles, ws.menubar, ws.launcher, ws.manager")
