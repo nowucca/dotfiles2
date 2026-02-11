@@ -160,7 +160,7 @@ function M.buildMenu()
   table.insert(menu, { title = "-" })
   table.insert(menu, { title = "Space Management:", disabled = true })
   table.insert(menu, {
-    title = "✨ Create New Space (⌘⌃⇧N)",
+    title = "✨ Create New Space...",
     fn = function() if spaceManager then spaceManager.createNewSpace() end end
   })
   table.insert(menu, {

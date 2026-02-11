@@ -51,7 +51,7 @@ end
 -- CHROME LAUNCHER
 -- ============================================
 
--- Open a new Chrome window on the current space
+-- Open a new Chrome window on the current space (multi-monitor aware)
 function M.openChrome()
   local originalSpaceId, screenUUID = getCurrentSpaceId()
   if not originalSpaceId then
@@ -59,29 +59,40 @@ function M.openChrome()
     return
   end
   
-  print("app-launcher: Opening Chrome on space " .. tostring(originalSpaceId))
+  -- Get the current screen so we can ensure window goes to the right monitor
+  local currentScreen = screen.mainScreen()
+  local win = window.focusedWindow()
+  if win then
+    currentScreen = win:screen()
+  end
+  
+  local targetLabel = getLabelForSpace(originalSpaceId)
+  print("app-launcher: Opening Chrome on space " .. tostring(originalSpaceId) .. " (" .. targetLabel .. ")")
+  print("app-launcher: Target screen: " .. currentScreen:name() .. " UUID: " .. screenUUID)
+  alert.show("Opening Chrome on " .. targetLabel .. "...")
   
   -- Get Chrome app and existing windows
   local chrome = application.get("Google Chrome")
   local existingWindows = getExistingWindowIds(chrome)
-  local wasRunning = (chrome ~= nil)
   
-  -- Create a new Chrome window via AppleScript
-  local script = [[
-    tell application "Google Chrome"
-      make new window
-      activate
-    end tell
-  ]]
-  
-  local ok, err = hs.osascript.applescript(script)
-  if not ok then
-    alert.show("Chrome error: " .. tostring(err))
-    return
+  if chrome then
+    -- Chrome is running - use keyboard shortcut (Cmd+N) for new window
+    chrome:activate()
+    timer.doAfter(0.15, function()
+      hs.eventtap.keyStroke({"cmd"}, "n")
+      -- After creating window, find and move it (multi-monitor aware)
+      timer.doAfter(0.5, function()
+        M.findAndMoveNewWindowMultiMonitor("Google Chrome", existingWindows, originalSpaceId, currentScreen, nil)
+      end)
+    end)
+  else
+    -- Chrome not running - launch it
+    application.launchOrFocus("Google Chrome")
+    -- Wait for app to start and create default window
+    timer.doAfter(1.0, function()
+      M.findAndMoveNewWindowMultiMonitor("Google Chrome", existingWindows, originalSpaceId, currentScreen, nil)
+    end)
   end
-  
-  -- Watch for the new window and move it to original space
-  M.waitAndMoveNewWindow("Google Chrome", existingWindows, originalSpaceId, screenUUID)
 end
 
 -- ============================================
@@ -198,14 +209,17 @@ function M.findAndMoveNewWindowMultiMonitor(appName, existingWindows, targetSpac
                       winToFocus:focus()
                       -- Raise it too
                       winToFocus:raise()
-                      alert.show("iTerm ready")
+                      -- Show app name in alert
+                      local displayName = appName == "Google Chrome" and "Chrome" or appName
+                      alert.show(displayName .. " ready")
                       -- Refresh menubar after a brief delay
                       timer.doAfter(0.2, function()
                         if M.onWindowLaunched then M.onWindowLaunched() end
                       end)
                     else
                       print("app-launcher: Could not get window to focus")
-                      alert.show("iTerm opened")
+                      local displayName = appName == "Google Chrome" and "Chrome" or appName
+                      alert.show(displayName .. " opened")
                     end
                   end)
                 end)
