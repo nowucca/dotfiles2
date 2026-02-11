@@ -308,19 +308,26 @@ function M.promptForLabelThenCreate(scr)
     print("space-manager: gotoSpace returned: " .. tostring(gotoResult))
     
     -- Wait for space switch to complete, then launch apps with explicit target
+    print("space-manager: Scheduling post-switch timer...")
     timer.doAfter(0.8, function()
-      print("space-manager: Post-switch timer fired")
-      
-      -- Get current space - use screen directly instead of focused window
-      local activeSpaces = spaces.activeSpaces()
-      local screenUUID = scr:getUUID()
-      local currentSpace = activeSpaces[screenUUID]
-      print("space-manager: Now on space " .. tostring(currentSpace) .. " (target: " .. tostring(newSpaceId) .. ")")
-      
-      -- Launch default apps regardless of space check (we'll move them anyway)
-      print("space-manager: Proceeding to setup apps...")
-      M.setupNewSpaceWithTarget(newSpaceId, scr, labelName)
+      local ok, err = pcall(function()
+        print("space-manager: Post-switch timer fired")
+        
+        -- Get current space - use screen directly instead of focused window
+        local activeSpaces = spaces.activeSpaces()
+        local screenUUID = scr:getUUID()
+        local currentSpace = activeSpaces[screenUUID]
+        print("space-manager: Now on space " .. tostring(currentSpace) .. " (target: " .. tostring(newSpaceId) .. ")")
+        
+        -- Launch default apps regardless of space check (we'll move them anyway)
+        print("space-manager: Proceeding to setup apps...")
+        M.setupNewSpaceWithTarget(newSpaceId, scr, labelName)
+      end)
+      if not ok then
+        print("space-manager: ERROR in post-switch timer: " .. tostring(err))
+      end
     end)
+    print("space-manager: Post-switch timer scheduled")
   end)
 end
 
@@ -376,42 +383,244 @@ function M.setupNewSpaceWithTarget(targetSpaceId, targetScreen, labelName)
   end)
 end
 
--- Launch an app and move its window to a specific target space/screen
+-- Launch an app and create its window ON the target space (not move after creation)
+-- Key insight: windows resist being moved after creation, so we create them where we want them
 function M.launchAppOnTargetSpace(appName, altAppName, targetSpaceId, targetScreen, callback)
   local application = require("hs.application")
   
   print("space-manager: Launching " .. appName .. " on space " .. tostring(targetSpaceId))
   
-  -- Get existing windows before launch
-  local app = application.get(appName)
-  if not app and altAppName then
-    app = application.get(altAppName)
-  end
+  -- CRITICAL: Switch to target space FIRST, then create window there
+  -- This avoids the "move after creation" problem entirely
+  print("space-manager: Switching to target space " .. tostring(targetSpaceId) .. " before creating window")
+  spaces.gotoSpace(targetSpaceId)
   
-  local existingWindows = {}
-  if app then
-    for _, win in ipairs(app:allWindows()) do
-      existingWindows[win:id()] = true
+  timer.doAfter(0.5, function()
+    -- Get existing windows before launch (now that we're on target space)
+    local app = application.get(appName)
+    if not app and altAppName then
+      app = application.get(altAppName)
     end
     
-    -- App is running - use Cmd+N to create new window
-    app:activate()
-    timer.doAfter(0.2, function()
-      hs.eventtap.keyStroke({"cmd"}, "n")
-      timer.doAfter(0.5, function()
-        M.findAndMoveWindowToTarget(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+    local existingWindows = {}
+    if app then
+      for _, win in ipairs(app:allWindows()) do
+        existingWindows[win:id()] = true
+      end
+    end
+    
+    -- CHROME SPECIAL CASE: Chrome has its own window placement logic that overrides
+    -- normal behavior. Using command-line launch bypasses Chrome's "switch to last active space" behavior.
+    if appName == "Google Chrome" then
+      print("space-manager: Chrome special case - using command line launch to avoid space switching")
+      -- Use 'open -na' which creates a new window without activating existing Chrome first
+      hs.task.new("/usr/bin/open", function(exitCode, stdOut, stdErr)
+        print("space-manager: Chrome command line launch completed, exit code: " .. tostring(exitCode))
+        timer.doAfter(1.5, function()
+          M.findAndVerifyWindowAndMove(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+        end)
+      end, {"-na", "Google Chrome", "--args", "--new-window"}):start()
+      return
+    end
+    
+    -- For other apps: standard approach
+    if app then
+      -- App is running - use Cmd+N to create new window ON THIS SPACE
+      print("space-manager: App running, creating new window with Cmd+N")
+      app:activate()
+      timer.doAfter(0.3, function()
+        hs.eventtap.keyStroke({"cmd"}, "n")
+        timer.doAfter(0.8, function()
+          M.findAndVerifyWindow(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+        end)
       end)
-    end)
-  else
-    -- App not running - launch it
-    application.launchOrFocus(appName)
-    timer.doAfter(1.5, function()
-      M.findAndMoveWindowToTarget(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
-    end)
-  end
+    else
+      -- App not running - launch it (window will appear on current/target space)
+      print("space-manager: Launching app fresh")
+      application.launchOrFocus(appName)
+      timer.doAfter(2.0, function()
+        M.findAndVerifyWindow(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+      end)
+    end
+  end)
 end
 
--- Find a new window and move it to the target space/screen
+-- Find, verify, and forcefully move a window to target space if needed (for stubborn apps like Chrome)
+function M.findAndVerifyWindowAndMove(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+  local application = require("hs.application")
+  local attempts = 0
+  local maxAttempts = 40
+  local targetScreenUUID = targetScreen:getUUID()
+  
+  local function checkAndMove()
+    attempts = attempts + 1
+    
+    local app = application.get(appName)
+    if not app and altAppName then
+      app = application.get(altAppName)
+    end
+    
+    if app then
+      for _, win in ipairs(app:allWindows()) do
+        if not existingWindows[win:id()] and win:isStandard() then
+          local winId = win:id()
+          local displayName = appName == "Google Chrome" and "Chrome" or appName
+          print("space-manager: Found new " .. displayName .. " window " .. tostring(winId) .. " after " .. attempts .. " attempts")
+          
+          -- Check where the window actually landed
+          local windowSpaces = spaces.windowSpaces(winId) or {}
+          local currentWindowSpace = windowSpaces[1]
+          print("space-manager: " .. displayName .. " window is on space " .. tostring(currentWindowSpace) .. " (target: " .. tostring(targetSpaceId) .. ")")
+          
+          if currentWindowSpace == targetSpaceId then
+            -- Perfect! Window is where we want it
+            print("space-manager: " .. displayName .. " already on correct space!")
+            win:focus()
+            win:raise()
+            if callback then callback() end
+            return
+          end
+          
+          -- Window is on wrong space - need to move it
+          print("space-manager: " .. displayName .. " on wrong space, attempting aggressive move...")
+          
+          -- Step 1: Move window to target screen if needed
+          local windowScreen = win:screen()
+          if windowScreen and windowScreen:getUUID() ~= targetScreenUUID then
+            print("space-manager: Moving window to target screen first")
+            win:setFrame(targetScreen:frame())
+          end
+          
+          -- Step 2: Go to target space
+          timer.doAfter(0.3, function()
+            print("space-manager: Switching to target space " .. tostring(targetSpaceId))
+            spaces.gotoSpace(targetSpaceId)
+            
+            -- Step 3: After being on target space, try moveWindowToSpace
+            timer.doAfter(0.5, function()
+              print("space-manager: Attempting moveWindowToSpace for " .. displayName)
+              local moveResult = spaces.moveWindowToSpace(winId, targetSpaceId)
+              print("space-manager: moveWindowToSpace returned: " .. tostring(moveResult))
+              
+              -- Step 4: Verify and retry if needed
+              timer.doAfter(0.3, function()
+                local newSpaces = spaces.windowSpaces(winId) or {}
+                local newSpace = newSpaces[1]
+                print("space-manager: After move, " .. displayName .. " is on space " .. tostring(newSpace))
+                
+                if newSpace == targetSpaceId then
+                  print("space-manager: " .. displayName .. " successfully moved to target space!")
+                  local freshWin = window.get(winId)
+                  if freshWin then
+                    freshWin:focus()
+                    freshWin:raise()
+                  end
+                  if callback then callback() end
+                else
+                  -- Last resort: try setFrame to pull window to current space
+                  print("space-manager: Move failed, trying setFrame workaround...")
+                  local freshWin = window.get(winId)
+                  if freshWin then
+                    -- Position window on target screen
+                    local targetFrame = targetScreen:frame()
+                    targetFrame.x = targetFrame.x + 50
+                    targetFrame.y = targetFrame.y + 50
+                    freshWin:setFrame(targetFrame)
+                    
+                    timer.doAfter(0.3, function()
+                      -- Try move one more time
+                      spaces.moveWindowToSpace(winId, targetSpaceId)
+                      timer.doAfter(0.2, function()
+                        local fw = window.get(winId)
+                        if fw then
+                          fw:focus()
+                          fw:raise()
+                        end
+                        print("space-manager: " .. displayName .. " setup complete (best effort)")
+                        if callback then callback() end
+                      end)
+                    end)
+                  else
+                    if callback then callback() end
+                  end
+                end
+              end)
+            end)
+          end)
+          
+          return  -- Done searching
+        end
+      end
+    end
+    
+    if attempts < maxAttempts then
+      timer.doAfter(0.1, checkAndMove)
+    else
+      print("space-manager: Could not find new window for " .. appName .. " after " .. maxAttempts .. " attempts")
+      if callback then callback() end
+    end
+  end
+  
+  checkAndMove()
+end
+
+-- Find and verify a new window is on the target space (simpler version - window created on target space)
+function M.findAndVerifyWindow(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+  local application = require("hs.application")
+  local attempts = 0
+  local maxAttempts = 30
+  
+  local function checkWindow()
+    attempts = attempts + 1
+    
+    local app = application.get(appName)
+    if not app and altAppName then
+      app = application.get(altAppName)
+    end
+    
+    if app then
+      for _, win in ipairs(app:allWindows()) do
+        if not existingWindows[win:id()] and win:isStandard() then
+          local winId = win:id()
+          print("space-manager: Found new " .. appName .. " window " .. tostring(winId) .. " after " .. attempts .. " attempts")
+          
+          -- Verify it's on the target space
+          local windowSpaces = spaces.windowSpaces(winId) or {}
+          local currentWindowSpace = windowSpaces[1]
+          print("space-manager: Window is on space " .. tostring(currentWindowSpace) .. " (target: " .. tostring(targetSpaceId) .. ")")
+          
+          -- Focus and raise the window
+          win:focus()
+          win:raise()
+          
+          local displayName = appName == "Google Chrome" and "Chrome" or (appName == "iTerm2" and "iTerm" or appName)
+          
+          if currentWindowSpace == targetSpaceId then
+            print("space-manager: " .. displayName .. " ready on correct space!")
+          else
+            print("space-manager: WARNING: " .. displayName .. " on different space - macOS override?")
+            -- Note: We accept this and continue - the window was created while we were on target space
+            -- If macOS still put it elsewhere, we can't really fight it
+          end
+          
+          if callback then callback() end
+          return  -- Done
+        end
+      end
+    end
+    
+    if attempts < maxAttempts then
+      timer.doAfter(0.1, checkWindow)
+    else
+      print("space-manager: Could not find new window for " .. appName .. " after " .. maxAttempts .. " attempts")
+      if callback then callback() end
+    end
+  end
+  
+  checkWindow()
+end
+
+-- Find a new window and move it to the target space/screen (fallback for stubborn windows)
 function M.findAndMoveWindowToTarget(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
   local application = require("hs.application")
   local attempts = 0
@@ -462,20 +671,57 @@ function M.findAndMoveWindowToTarget(appName, altAppName, existingWindows, targe
               end)
             end)
           else
-            -- Same screen - still need to go to space first for reliable move
+            -- Same screen but potentially different space - need to move
+            -- First, check what space the window is currently on
+            local windowSpaces = spaces.windowSpaces(winId) or {}
+            local currentWindowSpace = windowSpaces[1]
+            print("space-manager: Window currently on space " .. tostring(currentWindowSpace) .. ", target is " .. tostring(targetSpaceId))
+            
+            -- Go to target space first
             print("space-manager: Going to space " .. tostring(targetSpaceId))
             spaces.gotoSpace(targetSpaceId)
             
             timer.doAfter(0.5, function()
-              print("space-manager: Moving window to space " .. tostring(targetSpaceId))
-              spaces.moveWindowToSpace(winId, targetSpaceId)
+              print("space-manager: Moving window " .. tostring(winId) .. " to space " .. tostring(targetSpaceId))
+              local moveResult = spaces.moveWindowToSpace(winId, targetSpaceId)
+              print("space-manager: moveWindowToSpace returned: " .. tostring(moveResult))
               
+              -- Verify the move worked
               timer.doAfter(0.3, function()
-                win:focus()
-                win:raise()
-                local displayName = appName == "Google Chrome" and "Chrome" or (appName == "iTerm2" and "iTerm" or appName)
-                print("space-manager: " .. displayName .. " ready on target space")
-                if callback then callback() end
+                local newSpaces = spaces.windowSpaces(winId) or {}
+                local newSpace = newSpaces[1]
+                print("space-manager: After move, window is on space " .. tostring(newSpace))
+                
+                if newSpace ~= targetSpaceId then
+                  -- Move failed - try again with screen move first
+                  print("space-manager: Move failed! Trying screen move workaround...")
+                  local targetFrame = targetScreen:frame()
+                  local freshWin = window.get(winId)
+                  if freshWin then
+                    freshWin:setFrame(targetFrame)
+                    timer.doAfter(0.3, function()
+                      spaces.gotoSpace(targetSpaceId)
+                      timer.doAfter(0.3, function()
+                        spaces.moveWindowToSpace(winId, targetSpaceId)
+                        timer.doAfter(0.2, function()
+                          local fw = window.get(winId)
+                          if fw then fw:focus(); fw:raise() end
+                          local displayName = appName == "Google Chrome" and "Chrome" or (appName == "iTerm2" and "iTerm" or appName)
+                          print("space-manager: " .. displayName .. " ready (after retry)")
+                          if callback then callback() end
+                        end)
+                      end)
+                    end)
+                  else
+                    if callback then callback() end
+                  end
+                else
+                  win:focus()
+                  win:raise()
+                  local displayName = appName == "Google Chrome" and "Chrome" or (appName == "iTerm2" and "iTerm" or appName)
+                  print("space-manager: " .. displayName .. " ready on target space")
+                  if callback then callback() end
+                end
               end)
             end)
           end
