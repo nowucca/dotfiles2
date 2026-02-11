@@ -48,8 +48,20 @@ end
 -- ============================================
 
 -- Close all windows on the current space, then remove the space
-function M.closeCurrentSpace()
-  local spaceId, scr = getCurrentSpaceInfo()
+-- If spaceId and scr are provided, use those (from confirmation dialog)
+-- Otherwise, get current space info fresh
+function M.closeCurrentSpace(providedSpaceId, providedScr)
+  local spaceId = providedSpaceId
+  local scr = providedScr
+  
+  -- If not provided, get current info
+  if not spaceId or not scr then
+    spaceId, scr = getCurrentSpaceInfo()
+  end
+  
+  print("space-manager: closeCurrentSpace called")
+  print("space-manager: spaceId = " .. tostring(spaceId) .. ", screen = " .. (scr and scr:name() or "nil"))
+  
   if not spaceId or not scr then
     alert.show("Cannot determine current space")
     return
@@ -58,6 +70,8 @@ function M.closeCurrentSpace()
   -- Get all spaces on this screen
   local screenUUID = scr:getUUID()
   local screenSpaces = spaces.spacesForScreen(scr) or {}
+  
+  print("space-manager: Screen " .. scr:name() .. " has " .. #screenSpaces .. " spaces: " .. hs.json.encode(screenSpaces))
   
   -- Don't close if it's the only space on this screen
   if #screenSpaces <= 1 then
@@ -103,22 +117,68 @@ end
 function M.removeSpaceIfEmpty(spaceId, scr, label, originalWindowCount)
   print("space-manager: Attempting to remove space " .. tostring(spaceId))
   
-  -- Remove the space
-  local result = spaces.removeSpace(spaceId)
+  -- Find an adjacent space to switch to before removing
+  local screenSpaces = spaces.spacesForScreen(scr) or {}
+  local targetSpace = nil
   
-  if result then
-    print("space-manager: Space removed successfully")
-    alert.show("Closed: " .. label .. " (" .. originalWindowCount .. " windows)")
-  else
-    print("space-manager: Failed to remove space")
-    alert.show("Closed windows but couldn't remove space")
+  for i, sid in ipairs(screenSpaces) do
+    if sid == spaceId then
+      -- Prefer the space before, otherwise the space after
+      if i > 1 then
+        targetSpace = screenSpaces[i - 1]
+      elseif i < #screenSpaces then
+        targetSpace = screenSpaces[i + 1]
+      end
+      break
+    end
   end
+  
+  if not targetSpace then
+    print("space-manager: No adjacent space found to switch to")
+    alert.show("Closed windows but couldn't remove space")
+    return
+  end
+  
+  -- Switch to the adjacent space first
+  print("space-manager: Switching to adjacent space " .. tostring(targetSpace) .. " before removal")
+  spaces.gotoSpace(targetSpace)
+  
+  -- Wait for switch, then remove the space
+  timer.doAfter(0.5, function()
+    print("space-manager: Now removing space " .. tostring(spaceId))
+    local result = spaces.removeSpace(spaceId)
+    
+    if result then
+      print("space-manager: Space removed successfully")
+      
+      -- Also remove the label from data
+      if spaceLabels then
+        local data = require("modules.data")
+        local d = data.load()
+        if d.labels and d.labels[tostring(spaceId)] then
+          d.labels[tostring(spaceId)] = nil
+          data.save(d)
+          print("space-manager: Removed label for space " .. tostring(spaceId))
+        end
+      end
+      
+      alert.show("✓ Closed: " .. label .. " (" .. originalWindowCount .. " windows)")
+    else
+      print("space-manager: Failed to remove space")
+      alert.show("Closed windows but couldn't remove space")
+    end
+  end)
 end
 
 -- Confirm before closing space
 function M.confirmCloseCurrentSpace()
+  -- IMPORTANT: Capture space and screen BEFORE showing dialog
+  -- because the dialog will shift focus to a different screen
   local spaceId, scr = getCurrentSpaceInfo()
-  if not spaceId then
+  
+  print("space-manager: confirmCloseCurrentSpace - captured space " .. tostring(spaceId) .. " on " .. (scr and scr:name() or "nil"))
+  
+  if not spaceId or not scr then
     alert.show("Cannot determine current space")
     return
   end
@@ -134,7 +194,8 @@ function M.confirmCloseCurrentSpace()
   )
   
   if button == "Close Space" then
-    M.closeCurrentSpace()
+    -- Pass the captured spaceId and screen to closeCurrentSpace
+    M.closeCurrentSpace(spaceId, scr)
   end
 end
 
