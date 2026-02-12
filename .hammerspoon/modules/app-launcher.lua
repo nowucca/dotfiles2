@@ -52,6 +52,7 @@ end
 -- ============================================
 
 -- Open a new Chrome window on the current space (multi-monitor aware)
+-- Uses command-line launch to bypass Chrome's "switch to last active space" behavior
 function M.openChrome()
   local originalSpaceId, screenUUID = getCurrentSpaceId()
   if not originalSpaceId then
@@ -71,28 +72,170 @@ function M.openChrome()
   print("app-launcher: Target screen: " .. currentScreen:name() .. " UUID: " .. screenUUID)
   alert.show("Opening Chrome on " .. targetLabel .. "...")
   
-  -- Get Chrome app and existing windows
+  -- Get Chrome app and existing windows BEFORE we do anything
   local chrome = application.get("Google Chrome")
   local existingWindows = getExistingWindowIds(chrome)
   
-  if chrome then
-    -- Chrome is running - use keyboard shortcut (Cmd+N) for new window
-    chrome:activate()
-    timer.doAfter(0.15, function()
-      hs.eventtap.keyStroke({"cmd"}, "n")
-      -- After creating window, find and move it (multi-monitor aware)
-      timer.doAfter(0.5, function()
-        M.findAndMoveNewWindowMultiMonitor("Google Chrome", existingWindows, originalSpaceId, currentScreen, nil)
+  -- CRITICAL: Switch to target space FIRST to ensure window lands here
+  print("app-launcher: Switching to target space " .. tostring(originalSpaceId) .. " first")
+  spaces.gotoSpace(originalSpaceId)
+  
+  timer.doAfter(0.5, function()
+    -- Re-capture existing windows just before creating (Stage Manager can change things)
+    local chrome = application.get("Google Chrome")
+    existingWindows = getExistingWindowIds(chrome)
+    -- Count existing windows for logging (can't json.encode a table with non-integer keys)
+    local windowCount = 0
+    for _ in pairs(existingWindows) do windowCount = windowCount + 1 end
+    print("app-launcher: Existing Chrome windows: " .. tostring(windowCount))
+    
+    if chrome then
+      -- Chrome is already running - use AppleScript to create new window on current space
+      -- This is more reliable than 'open -na' which sometimes just activates
+      print("app-launcher: Chrome running, using AppleScript to create new window")
+      hs.osascript.applescript([[
+        tell application "Google Chrome"
+          make new window
+        end tell
+      ]])
+      timer.doAfter(1.0, function()
+        M.findAndMoveNewChromeWindow(existingWindows, originalSpaceId, currentScreen)
       end)
-    end)
-  else
-    -- Chrome not running - launch it
-    application.launchOrFocus("Google Chrome")
-    -- Wait for app to start and create default window
-    timer.doAfter(1.0, function()
-      M.findAndMoveNewWindowMultiMonitor("Google Chrome", existingWindows, originalSpaceId, currentScreen, nil)
-    end)
+    else
+      -- Chrome not running - launch it fresh
+      print("app-launcher: Chrome not running, launching fresh")
+      application.launchOrFocus("Google Chrome")
+      timer.doAfter(2.0, function()
+        M.findAndMoveNewChromeWindow(existingWindows, originalSpaceId, currentScreen)
+      end)
+    end
+  end)
+end
+
+-- Find new Chrome window and aggressively move it to target space/screen if needed
+function M.findAndMoveNewChromeWindow(existingWindows, targetSpaceId, targetScreen)
+  local attempts = 0
+  local maxAttempts = 40
+  local targetScreenUUID = targetScreen:getUUID()
+  local targetLabel = getLabelForSpace(targetSpaceId)
+  
+  local function checkAndMove()
+    attempts = attempts + 1
+    
+    local chrome = application.get("Google Chrome")
+    if chrome then
+      for _, win in ipairs(chrome:allWindows()) do
+        if not existingWindows[win:id()] and win:isStandard() then
+          local winId = win:id()
+          print("app-launcher: Found new Chrome window " .. tostring(winId) .. " after " .. attempts .. " attempts")
+          
+          -- Check where the window actually landed
+          local windowSpaces = spaces.windowSpaces(winId) or {}
+          local currentWindowSpace = windowSpaces[1]
+          local windowScreen = win:screen()
+          print("app-launcher: Chrome window on space " .. tostring(currentWindowSpace) .. " (target: " .. tostring(targetSpaceId) .. ")")
+          print("app-launcher: Chrome window on screen " .. (windowScreen and windowScreen:name() or "nil") .. " (target: " .. targetScreen:name() .. ")")
+          
+          -- Check if already on correct space AND screen
+          local onCorrectSpace = currentWindowSpace == targetSpaceId
+          local onCorrectScreen = windowScreen and windowScreen:getUUID() == targetScreenUUID
+          
+          if onCorrectSpace and onCorrectScreen then
+            print("app-launcher: Chrome already on correct space and screen!")
+            win:focus()
+            win:raise()
+            alert.show("Chrome ready")
+            if M.onWindowLaunched then M.onWindowLaunched() end
+            return
+          end
+          
+          -- Need to move the window - do it aggressively
+          print("app-launcher: Chrome on wrong space/screen, attempting aggressive move...")
+          
+          -- Step 1: Move to target screen if needed
+          if not onCorrectScreen then
+            print("app-launcher: Moving Chrome to target screen first")
+            local targetFrame = targetScreen:frame()
+            win:setFrame(targetFrame)
+          end
+          
+          -- Step 2: Go to target space
+          timer.doAfter(0.3, function()
+            print("app-launcher: Switching to target space " .. tostring(targetSpaceId))
+            spaces.gotoSpace(targetSpaceId)
+            
+            -- Step 3: Move window to target space
+            timer.doAfter(0.5, function()
+              print("app-launcher: Moving Chrome window to space " .. tostring(targetSpaceId))
+              local moveResult = spaces.moveWindowToSpace(winId, targetSpaceId)
+              print("app-launcher: moveWindowToSpace returned: " .. tostring(moveResult))
+              
+              -- Step 4: Verify and retry if needed
+              timer.doAfter(0.3, function()
+                local newSpaces = spaces.windowSpaces(winId) or {}
+                local newSpace = newSpaces[1]
+                print("app-launcher: After move, Chrome is on space " .. tostring(newSpace))
+                
+                if newSpace == targetSpaceId then
+                  print("app-launcher: Chrome successfully moved!")
+                  local freshWin = window.get(winId)
+                  if freshWin then
+                    freshWin:focus()
+                    freshWin:raise()
+                  end
+                  alert.show("Chrome ready")
+                  if M.onWindowLaunched then M.onWindowLaunched() end
+                else
+                  -- Last resort: setFrame workaround
+                  print("app-launcher: Move failed, trying setFrame workaround...")
+                  local freshWin = window.get(winId)
+                  if freshWin then
+                    local targetFrame = targetScreen:frame()
+                    targetFrame.x = targetFrame.x + 50
+                    targetFrame.y = targetFrame.y + 50
+                    freshWin:setFrame(targetFrame)
+                    
+                    timer.doAfter(0.3, function()
+                      spaces.moveWindowToSpace(winId, targetSpaceId)
+                      timer.doAfter(0.2, function()
+                        local fw = window.get(winId)
+                        if fw then
+                          fw:focus()
+                          fw:raise()
+                        end
+                        alert.show("Chrome ready (best effort)")
+                        if M.onWindowLaunched then M.onWindowLaunched() end
+                      end)
+                    end)
+                  else
+                    alert.show("Chrome opened")
+                    if M.onWindowLaunched then M.onWindowLaunched() end
+                  end
+                end
+              end)
+            end)
+          end)
+          
+          return  -- Done searching
+        end
+      end
+    end
+    
+    if attempts < maxAttempts then
+      timer.doAfter(0.1, checkAndMove)
+    else
+      -- Window detection failed but window may have still been created on correct space
+      -- This commonly happens with Stage Manager which hides windows from enumeration
+      print("app-launcher: Could not detect new Chrome window after " .. maxAttempts .. " attempts")
+      print("app-launcher: Window likely created on target space (Stage Manager may hide it from enumeration)")
+      spaces.gotoSpace(targetSpaceId)
+      -- Give positive feedback - AppleScript make new window usually works
+      alert.show("Chrome ready")
+      if M.onWindowLaunched then M.onWindowLaunched() end
+    end
   end
+  
+  checkAndMove()
 end
 
 -- ============================================
