@@ -124,6 +124,74 @@ function M.findAndMoveNewChromeWindow(existingWindows, targetSpaceId, targetScre
     
     local chrome = application.get("Google Chrome")
     if chrome then
+      -- WORKAROUND: Stage Manager hides new windows from app:allWindows()
+      -- Try using focusedWindow() since the AppleScript created window should be focused
+      if attempts == 1 then
+        local focused = window.focusedWindow()
+        if focused then
+          local focusedApp = focused:application()
+          if focusedApp and focusedApp:name() == "Google Chrome" then
+            local focusedId = focused:id()
+            if not existingWindows[focusedId] and focused:isStandard() then
+              print("app-launcher: Found new Chrome window via focusedWindow(): " .. tostring(focusedId))
+              -- Found it! Process this window
+              local winId = focusedId
+              local win = focused
+              
+              -- Check where the window actually landed
+              local windowSpaces = spaces.windowSpaces(winId) or {}
+              local currentWindowSpace = windowSpaces[1]
+              local windowScreen = win:screen()
+              print("app-launcher: Chrome window on space " .. tostring(currentWindowSpace) .. " (target: " .. tostring(targetSpaceId) .. ")")
+              print("app-launcher: Chrome window on screen " .. (windowScreen and windowScreen:name() or "nil") .. " (target: " .. targetScreen:name() .. ")")
+              
+              -- Check if already on correct space AND screen
+              local onCorrectSpace = currentWindowSpace == targetSpaceId
+              local onCorrectScreen = windowScreen and windowScreen:getUUID() == targetScreenUUID
+              
+              if onCorrectSpace and onCorrectScreen then
+                print("app-launcher: Chrome already on correct space and screen!")
+                win:focus()
+                win:raise()
+                alert.show("Chrome ready")
+                if M.onWindowLaunched then M.onWindowLaunched() end
+                return
+              end
+              
+              -- Need to move the window
+              print("app-launcher: Chrome on wrong space/screen, moving...")
+              if not onCorrectScreen then
+                print("app-launcher: Moving Chrome to target screen first")
+                local targetFrame = targetScreen:frame()
+                win:setFrame(targetFrame)
+              end
+              
+              timer.doAfter(0.3, function()
+                spaces.gotoSpace(targetSpaceId)
+                timer.doAfter(0.5, function()
+                  spaces.moveWindowToSpace(winId, targetSpaceId)
+                  timer.doAfter(0.3, function()
+                    local fw = window.get(winId)
+                    if fw then fw:focus(); fw:raise() end
+                    alert.show("Chrome ready")
+                    if M.onWindowLaunched then M.onWindowLaunched() end
+                  end)
+                end)
+              end)
+              return
+            end
+          end
+        end
+      end
+      
+      -- Debug: log all windows on first attempt
+      if attempts == 1 or attempts == 10 or attempts == 40 then
+        print("app-launcher: DEBUG - Chrome allWindows at attempt " .. attempts .. ":")
+        for _, win in ipairs(chrome:allWindows()) do
+          print("app-launcher:   Window " .. tostring(win:id()) .. " isStandard=" .. tostring(win:isStandard()) .. " existing=" .. tostring(existingWindows[win:id()]))
+        end
+      end
+      
       for _, win in ipairs(chrome:allWindows()) do
         if not existingWindows[win:id()] and win:isStandard() then
           local winId = win:id()
