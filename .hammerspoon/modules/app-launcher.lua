@@ -162,19 +162,37 @@ function M.findAndMoveNewChromeWindow(existingWindows, targetSpaceId, targetScre
               print("app-launcher: Chrome on wrong space/screen, moving...")
               if not onCorrectScreen then
                 print("app-launcher: Moving Chrome to target screen first")
-                local targetFrame = targetScreen:frame()
-                win:setFrame(targetFrame)
+                local ok, err = pcall(function()
+                  local targetFrame = targetScreen:frame()
+                  win:setFrame(targetFrame)
+                end)
+                if not ok then
+                  print("app-launcher: Error moving to screen: " .. tostring(err))
+                end
               end
               
               timer.doAfter(0.3, function()
-                spaces.gotoSpace(targetSpaceId)
+                local ok, err = pcall(function()
+                  spaces.gotoSpace(targetSpaceId)
+                end)
+                if not ok then print("app-launcher: Error in gotoSpace: " .. tostring(err)) end
+                
                 timer.doAfter(0.5, function()
-                  spaces.moveWindowToSpace(winId, targetSpaceId)
+                  local ok2, err2 = pcall(function()
+                    spaces.moveWindowToSpace(winId, targetSpaceId)
+                  end)
+                  if not ok2 then print("app-launcher: Error in moveWindowToSpace: " .. tostring(err2)) end
+                  
                   timer.doAfter(0.3, function()
-                    local fw = window.get(winId)
-                    if fw then fw:focus(); fw:raise() end
+                    local ok3, err3 = pcall(function()
+                      local fw = window.get(winId)
+                      if fw then fw:focus(); fw:raise() end
+                    end)
+                    if not ok3 then print("app-launcher: Error focusing window: " .. tostring(err3)) end
                     alert.show("Chrome ready")
-                    if M.onWindowLaunched then M.onWindowLaunched() end
+                    if M.onWindowLaunched then
+                      pcall(M.onWindowLaunched)
+                    end
                   end)
                 end)
               end)
