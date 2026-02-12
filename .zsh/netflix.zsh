@@ -55,8 +55,6 @@ alias weepls="alias awsdbtest awsdbprod awstest awsdeleng"
 # LLM/AI aliases
 alias llm='/Users/satkinson/.llm-netflix/env/bin/llm'
 alias bot='/Users/satkinson/.llm-netflix/env/bin/llm netflix'
-alias clauded='claude --dangerously-skip-permissions'
-alias claudedr='claude --dangerously-skip-permissions --resume'
 alias alacritty='/Applications/Alacritty.app/Contents/MacOS/alacritty &'
 
 # AI Proxy configuration
