@@ -314,7 +314,9 @@ function M.launchAppOnTargetSpace(appName, altAppName, targetSpaceId, targetScre
       end
     end
     
-    -- Chrome special case: use AppleScript to avoid space-switching behavior
+    -- Use AppleScript for known apps to avoid space-switching behavior
+    -- app:activate() switches macOS to whatever space the app is on,
+    -- causing new windows to appear on the wrong space
     if appName == "Google Chrome" then
       print("space-manager: Chrome - using AppleScript for new window")
       hs.osascript.applescript([[
@@ -327,7 +329,20 @@ function M.launchAppOnTargetSpace(appName, altAppName, targetSpaceId, targetScre
       end)
       return
     end
-    
+
+    if appName == "iTerm2" or appName == "iTerm" then
+      print("space-manager: iTerm - using AppleScript for new window")
+      hs.osascript.applescript([[
+        tell application "iTerm2"
+          create window with default profile
+        end tell
+      ]])
+      timer.doAfter(1.0, function()
+        M.findAndMoveWindow(appName, altAppName, existingWindows, targetSpaceId, targetScreen, callback)
+      end)
+      return
+    end
+
     -- Standard apps: activate and Cmd+N
     if app then
       safeCall(function() app:activate() end, "activating app")
