@@ -293,26 +293,27 @@ function M.launchAppToCurrentSpace(appName, bundleID, targetSpaceId, targetScree
 end
 
 -- Create a new iTerm window on the current space (multi-monitor aware)
--- Uses keyboard simulation to preserve shell settings (colored prompt, etc.)
+-- Uses AppleScript to avoid space-switching behavior
 function M.createiTermWindowOnCurrentSpace(spaceId, targetScreen)
   -- Get existing windows before creating new one
   local iterm = application.get("iTerm2") or application.get("iTerm")
   local existingWindows = {}
-  
+
   if iterm then
     for _, win in ipairs(iterm:allWindows()) do
       existingWindows[win:id()] = true
     end
-    
-    -- Use keyboard simulation (preserves shell settings)
-    iterm:activate()
-    timer.doAfter(0.15, function()
-      hs.eventtap.keyStroke({"cmd"}, "n")
-      
-      -- Wait for window then move it
-      timer.doAfter(0.5, function()
-        M.findAndMoveNewWindow("iTerm2", existingWindows, spaceId, targetScreen, "iTerm")
-      end)
+
+    -- Use AppleScript to create window without switching spaces
+    -- app:activate() would switch macOS to whatever space iTerm is on
+    print("profiles: iTerm running, using AppleScript to create new window")
+    hs.osascript.applescript([[
+      tell application "iTerm2"
+        create window with default profile
+      end tell
+    ]])
+    timer.doAfter(1.0, function()
+      M.findAndMoveNewWindow("iTerm2", existingWindows, spaceId, targetScreen, "iTerm")
     end)
   else
     -- iTerm not running, launch it

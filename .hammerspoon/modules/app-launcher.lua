@@ -352,17 +352,19 @@ function M.openITerm()
   local iterm = application.get("iTerm2") or application.get("iTerm")
   local existingWindows = getExistingWindowIds(iterm)
   
-  -- Use keyboard simulation to create window (preserves shell settings)
+  -- Use AppleScript to create window to avoid space-switching behavior
+  -- app:activate() switches macOS to whatever space iTerm is on,
+  -- causing new windows to appear on the wrong space
   local app = application.get("iTerm2") or application.get("iTerm")
   if app then
-    app:activate()
-    -- Small delay before keystroke
-    timer.doAfter(0.15, function()
-      hs.eventtap.keyStroke({"cmd"}, "n")
-      -- After creating window, wait longer then find and move it
-      timer.doAfter(0.5, function()
-        M.findAndMoveNewWindowMultiMonitor("iTerm2", existingWindows, originalSpaceId, currentScreen, "iTerm")
-      end)
+    print("app-launcher: iTerm running, using AppleScript to create new window")
+    hs.osascript.applescript([[
+      tell application "iTerm2"
+        create window with default profile
+      end tell
+    ]])
+    timer.doAfter(1.0, function()
+      M.findAndMoveNewWindowMultiMonitor("iTerm2", existingWindows, originalSpaceId, currentScreen, "iTerm")
     end)
   else
     -- If iTerm isn't running, launch it
