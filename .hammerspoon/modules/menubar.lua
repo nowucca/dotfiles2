@@ -38,144 +38,93 @@ end
 
 function M.buildMenu()
   local menu = {}
-  local d = data.load()
-  local key = spaceLabels and spaceLabels.currentKey() or nil
-  local currentLabel = key and data.getLabelForSpace(d, key) or nil
 
-  -- Current info
-  if currentLabel then
-    table.insert(menu, { title = "Current: " .. currentLabel, disabled = true })
-  else
-    table.insert(menu, { title = "Current: (unlabeled)", disabled = true })
-  end
-  table.insert(menu, { title = "-" })
-
-  -- Actions
-  table.insert(menu, {
-    title = "Set Label... (⌘⌃⇧L)",
-    fn = function() if spaceLabels then spaceLabels.promptForLabel() end end
-  })
-
-  table.insert(menu, {
-    title = "Switch Space... (⌘⌃Space)",
-    fn = function() if spaceSwitcher then spaceSwitcher.show() end end
-  })
-
-  if currentLabel then
-    table.insert(menu, {
-      title = "Clear Label",
-      fn = function() if spaceLabels then spaceLabels.clear() end end
-    })
-  end
-
-  -- Collect all labels
-  local sortedLabels = data.getAllLabels()
-
-  if #sortedLabels > 0 then
-    table.insert(menu, { title = "-" })
-    table.insert(menu, { title = "Apply Label (" .. #sortedLabels .. " total):", disabled = true })
-
-    for _, labelInfo in ipairs(sortedLabels) do
-      local labelName = labelInfo.name
-      local isCurrent = (labelName == currentLabel)
-      local daysAgo = math.floor((os.time() - labelInfo.lastUsed) / 86400)
-      local ageHint = ""
-      if daysAgo > 7 then
-        ageHint = " (" .. daysAgo .. "d)"
-      end
-
+  -- Spaces on current screen (click to switch)
+  if spaceSwitcher then
+    local spaceList = spaceSwitcher.getSpacesForCurrentScreen()
+    for _, info in ipairs(spaceList) do
+      local prefix = info.isActive and "→ " or "   "
+      local title = prefix .. (info.label or ("Space " .. info.index))
       table.insert(menu, {
-        title = (isCurrent and "→ " or "   ") .. labelName .. ageHint,
-        fn = function()
-          local newKey = spaceLabels and spaceLabels.currentKey() or nil
-          if newKey then
-            local d = data.load()
-            data.setLabelForSpace(d, newKey, labelName)
-            data.save(d)
-            hs.alert.show("Space labeled: " .. labelName)
-            M.update()
-          end
-        end
+        title = title,
+        disabled = info.isActive,
+        fn = function() spaceSwitcher.gotoSpace(info.spaceId) end
       })
     end
   end
 
-  -- Management section
+  -- Space actions
   table.insert(menu, { title = "-" })
   table.insert(menu, {
-    title = "Delete a Label...",
-    fn = function() if spaceLabels then spaceLabels.showDeleteLabelChooser() end end
+    title = "Set Label...  ⌘⌃⇧L",
+    fn = function() if spaceLabels then spaceLabels.promptForLabel() end end
   })
   table.insert(menu, {
-    title = "Prune Labels",
+    title = "New Space  ⌘⌃⇧N",
+    fn = function() if spaceManager then spaceManager.createNewSpace() end end
+  })
+  table.insert(menu, {
+    title = "Close Space  ⌘⌃⇧C",
+    fn = function() if spaceManager then spaceManager.confirmCloseCurrentSpace() end end
+  })
+
+  -- Open app on this space
+  table.insert(menu, { title = "-" })
+  table.insert(menu, {
+    title = "Chrome  ⌘⌃B",
+    fn = function() if appLauncher then appLauncher.openChrome() end end
+  })
+  table.insert(menu, {
+    title = "iTerm  ⌘⌃T",
+    fn = function() if appLauncher then appLauncher.openITerm() end end
+  })
+
+  -- Profiles submenu
+  table.insert(menu, { title = "-" })
+  table.insert(menu, {
+    title = "Profiles",
     menu = {
       {
-        title = "Older than 7 days",
-        fn = function() if spaceLabels then spaceLabels.pruneLabels(7) end end
+        title = "Save Profile...  ⌘⌃S",
+        fn = function() if profiles then profiles.promptSaveCurrentSpace() end end
       },
       {
-        title = "Older than 30 days",
-        fn = function() if spaceLabels then spaceLabels.pruneLabels(30) end end
+        title = "Restore Profile...  ⌘⌃R",
+        fn = function() if profiles then profiles.showRestoreChooser() end end
       },
       {
-        title = "Older than 90 days",
-        fn = function() if spaceLabels then spaceLabels.pruneLabels(90) end end
+        title = "Delete Profile...",
+        fn = function() if profiles then profiles.showDeleteChooser() end end
       }
     }
   })
 
-  -- Profiles section
-  table.insert(menu, { title = "-" })
-  table.insert(menu, { title = "Space Profiles:", disabled = true })
+  -- Manage labels submenu
   table.insert(menu, {
-    title = "Save Space Profile... (⌘⌃S)",
-    fn = function() if profiles then profiles.promptSaveCurrentSpace() end end
-  })
-  table.insert(menu, {
-    title = "Restore Profile... (⌘⌃R)",
-    fn = function() if profiles then profiles.showRestoreChooser() end end
-  })
-  table.insert(menu, {
-    title = "Delete Profile...",
-    fn = function() if profiles then profiles.showDeleteChooser() end end
-  })
-
-  -- App Launcher section
-  table.insert(menu, { title = "-" })
-  table.insert(menu, { title = "Open App Here:", disabled = true })
-  table.insert(menu, {
-    title = "🌐 Chrome (⌘⌃B)",
-    fn = function() if appLauncher then appLauncher.openChrome() end end
-  })
-  table.insert(menu, {
-    title = "💻 iTerm (⌘⌃T)",
-    fn = function() if appLauncher then appLauncher.openITerm() end end
-  })
-  table.insert(menu, {
-    title = "Choose App... (⌘⌃N)",
-    fn = function() if appLauncher then appLauncher.showLauncher() end end
-  })
-
-  -- Space Management section
-  table.insert(menu, { title = "-" })
-  table.insert(menu, { title = "Space Management:", disabled = true })
-  table.insert(menu, {
-    title = "✨ Create New Space (⌘⌃⇧N)",
-    fn = function() if spaceManager then spaceManager.createNewSpace() end end
-  })
-  table.insert(menu, {
-    title = "🗑️ Close This Space (⌘⌃⇧C)",
-    fn = function() if spaceManager then spaceManager.confirmCloseCurrentSpace() end end
-  })
-
-  table.insert(menu, { title = "-" })
-  table.insert(menu, {
-    title = "Show Banner (⌘⌃L)",
-    fn = function() if spaceLabels then spaceLabels.show() end end
-  })
-  table.insert(menu, {
-    title = "Debug Info",
-    fn = function() if spaceLabels then spaceLabels.debug() end end
+    title = "Manage Labels",
+    menu = {
+      {
+        title = "Apply Existing Label...",
+        fn = function() if spaceLabels then spaceLabels.rebind() end end
+      },
+      {
+        title = "Clear Current Label",
+        fn = function() if spaceLabels then spaceLabels.clear() end end
+      },
+      { title = "-" },
+      {
+        title = "Delete a Label...",
+        fn = function() if spaceLabels then spaceLabels.showDeleteLabelChooser() end end
+      },
+      {
+        title = "Prune Older than 7d",
+        fn = function() if spaceLabels then spaceLabels.pruneLabels(7) end end
+      },
+      {
+        title = "Prune Older than 30d",
+        fn = function() if spaceLabels then spaceLabels.pruneLabels(30) end end
+      }
+    }
   })
 
   return menu
