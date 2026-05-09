@@ -9,10 +9,16 @@ package.path = hs.configdir .. "/spaces/?.lua;"
 package.loaded["_helpers"] = nil
 local h = require("_helpers")
 
--- Drop any cached test modules from prior runs so they're re-executed against
--- the current code (a test_*.lua may have been edited since the last run).
+-- Drop cached test and product modules from prior runs so they're re-executed
+-- against the current code. Hammerspoon's Lua state persists across `hs -c`
+-- invocations, so without this an edited core.lua would be served from cache.
 for name in pairs(package.loaded) do
-  if name:match("^test_") then package.loaded[name] = nil end
+  if name:match("^test_")
+     or name:match("^core%.")
+     or name:match("^ui%.")
+     or name:match("^actions%.") then
+    package.loaded[name] = nil
+  end
 end
 
 local fs = require("hs.fs")
