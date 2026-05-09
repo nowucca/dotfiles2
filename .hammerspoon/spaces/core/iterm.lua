@@ -5,6 +5,7 @@ local spaces = require("hs.spaces")
 local screenMod = require("hs.screen")
 local windowMod = require("hs.window")
 local log = require("core.log")
+local timer = require("hs.timer")
 
 local M = {}
 
@@ -81,6 +82,126 @@ function M.snapshot()
   end
 
   return { windows = windows }
+end
+
+-- Escape a string for embedding in an AppleScript string literal.
+local function asEscape(s)
+  if not s then return "" end
+  return s:gsub("\\", "\\\\"):gsub('"', '\\"')
+end
+
+-- Create a new iTerm window. Returns the new window id (integer) or nil.
+-- opts: { profile, cwd, command, title }
+function M.newWindow(opts)
+  opts = opts or {}
+  local profile = opts.profile or "Default"
+  local cwd = opts.cwd
+  local command = opts.command
+  local title = opts.title
+
+  local script = string.format([[
+    tell application "iTerm2"
+      set newWin to (create window with profile "%s")
+      tell current session of newWin
+%s%s%s
+      end tell
+      return id of newWin
+    end tell
+  ]],
+    asEscape(profile),
+    cwd and ('        write text "cd ' .. asEscape(cwd) .. '"\n') or "",
+    command and ('        write text "' .. asEscape(command) .. '"\n') or "",
+    title and ('        set name to "' .. asEscape(title) .. '"\n') or ""
+  )
+
+  local ok, result, _ = osascript.applescript(script)
+  if not ok then
+    log.warn("iterm.newWindow: AppleScript failed")
+    return nil
+  end
+  return tonumber(result)
+end
+
+-- Create a new tab in a specific window. Returns the new tab's session UUID
+-- (string), matching the snapshot's `id` field shape, or nil on failure.
+function M.newTab(winId, opts)
+  if not winId then return nil end
+  opts = opts or {}
+  local cwd = opts.cwd
+  local command = opts.command
+  local title = opts.title
+
+  local script = string.format([[
+    tell application "iTerm2"
+      tell window id %d
+        set newTab to (create tab with default profile)
+        set newSession to current session of newTab
+        tell newSession
+%s%s%s
+        end tell
+        return unique ID of newSession
+      end tell
+    end tell
+  ]],
+    winId,
+    cwd and ('          write text "cd ' .. asEscape(cwd) .. '"\n') or "",
+    command and ('          write text "' .. asEscape(command) .. '"\n') or "",
+    title and ('          set name to "' .. asEscape(title) .. '"\n') or ""
+  )
+
+  local ok, result, _ = osascript.applescript(script)
+  if not ok then
+    log.warn("iterm.newTab: AppleScript failed for window " .. tostring(winId))
+    return nil
+  end
+  return result  -- session UUID string
+end
+
+-- Set a tab's session name (the visible "title"). Used to apply the
+-- [spaces:idle] prefix on launch so the tab shows up in the menubar before
+-- the agent starts overwriting it.
+function M.setTabTitle(winId, tabIndex, text)
+  local script = string.format([[
+    tell application "iTerm2"
+      tell window id %d
+        tell tab %d
+          tell current session
+            set name to "%s"
+          end tell
+        end tell
+      end tell
+    end tell
+  ]], winId, tabIndex, asEscape(text))
+  osascript.applescript(script)
+end
+
+-- Switch to the window's space (if needed), then select and focus the given
+-- tab by 1-based index. This is the primitive the menubar uses for
+-- click-to-focus rows.
+function M.focusTab(winId, tabIndex)
+  -- 1. Find the window's space and switch to it if we're not there.
+  local snap = M.snapshot()
+  local target
+  for _, w in ipairs(snap.windows) do if w.id == winId then target = w break end end
+  if target and target.space then
+    spaces.gotoSpace(target.space)
+  end
+
+  -- 2. Activate iTerm and select the tab. Wait briefly for the space switch.
+  timer.doAfter(0.3, function()
+    local script = string.format([[
+      tell application "iTerm2"
+        activate
+        tell window id %d
+          select
+          tell tab %d
+            select
+          end tell
+        end tell
+      end tell
+    ]], winId, tabIndex)
+    osascript.applescript(script)
+  end)
 end
 
 return M
