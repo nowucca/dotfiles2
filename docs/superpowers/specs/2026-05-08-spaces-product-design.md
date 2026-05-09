@@ -25,6 +25,13 @@ The existing `.hammerspoon/` config is a useful but unbranded toolkit for managi
 3. **Agent launchers** — two fixed actions: "New agent space…" and "New agent tab here".
 4. **Code reorganisation** — replace the flat `modules/` folder with a `spaces/` product folder under `.hammerspoon/`, with a small product-host `init.lua` that can later load additional products.
 
+### v1.5 (deferred, named for traceability)
+
+- **Extract to its own repo** — `spaces-hs` (working name) hosting the Lua product. Dotfiles `.hammerspoon/spaces` becomes a thin pointer (symlink during dev, eventually a release tag pulled via the install script).
+- **Manuals v2 site** — a `manual/` folder in the new repo, mirroring the Netflix manuals v2 format, covering install, the tab-title state convention, the shell shim, troubleshooting.
+- **Installable Claude skill** — a `.claude/skills/spaces.md` (or plugin) shipped from the same repo. Triggers on Hammerspoon/Spaces-related tasks: knows the architecture, the state convention, the hotkey set, and the conventions for adding new actions.
+- **Install script** — `install.sh` in the new repo: clones to a known path, symlinks `~/.hammerspoon/spaces`, sources `spaces.zsh`. Same script handles upgrades.
+
 ### v2 (deferred, named for traceability)
 
 - **Agent notifications** — native banners on state transitions (`run → done`, `run → wait`, `run → err`). Click switches space and focuses the specific iTerm tab.
