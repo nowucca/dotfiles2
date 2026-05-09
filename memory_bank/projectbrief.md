@@ -2,7 +2,7 @@
 
 ## Overview
 
-Personal dotfiles repository for macOS configuration, shell setup, and Hammerspoon-hosted desktop products. The repo holds the source of truth; `bootstrap.sh -f` rsyncs it to `~/`.
+Personal dotfiles repository for macOS configuration, shell setup, and Hammerspoon product hosting. The repo holds the source of truth; `bootstrap.sh -f` rsyncs it to `~/`.
 
 ## Components
 
@@ -10,13 +10,19 @@ Personal dotfiles repository for macOS configuration, shell setup, and Hammerspo
 
 `.zshrc`, `.zshenv`, `.tmux.conf`, and the modular `.zsh/` tree (`core/`, `aliases/`, `functions/`, `tools/`, `prompt.zsh`, `netflix.zsh`). No oh-my-zsh; lazy-loaded NVM/SDKMAN; fast git-aware prompt.
 
-### Hammerspoon products
+### Hammerspoon host
 
 `.hammerspoon/` is a multi-product host. `init.lua` (~37 lines) loads each product listed in `products.lua` and calls its `start()`/`stop()`. Each product owns its menubar widget and lifecycle.
 
-**Spaces** (v1, current): branded macOS-native shell for running long-running AI agents. Tab-title state convention surfaces agent state in the menubar; two hotkeys spawn agents into new spaces or new tabs.
+Products themselves live in their own repos under `~/spaces/`. Dotfiles symlinks them into `.hammerspoon/<product>` and bootstrap preserves the symlinks via `rsync -al`.
 
-Future products plug in as siblings (e.g. `spaces-hs`, `clipboard`, etc.) by dropping a folder under `.hammerspoon/` and adding the name to `products.lua`.
+Currently registered:
+
+| Product | Repo | Status |
+|---------|------|--------|
+| `spaces` | `~/spaces/hs-spaces/hs-spaces/main` | v1 shipped, v1.5 in progress |
+
+Future products plug in as siblings — drop a folder, add to `products.lua`.
 
 ### Dev tools
 
@@ -26,25 +32,25 @@ Future products plug in as siblings (e.g. `spaces-hs`, `clipboard`, etc.) by dro
 
 - macOS-only for Hammerspoon products. Shell config aims to also work on Linux.
 - Zsh as primary shell.
-- `bootstrap.sh -f` uses rsync **without** `--delete` — removing a file from the repo doesn't remove it from `~/`. Explicit `rm` required when retiring directories.
+- `bootstrap.sh -f` uses rsync **without** `--delete` — removing a file from the repo doesn't remove it from `~/`. Explicit `rm` required when retiring directories or replacing dirs with symlinks.
 - Sensitive data in `.netflix-extra` (gitignored).
 
-## In scope
+## In scope (this repo)
 
 - Shell config (zsh, tmux, prompt) and aliases/functions.
 - Git config and editor config.
-- Hammerspoon products that orchestrate macOS Spaces, agents, and apps.
-- Pure-Lua tests for product modules; manual smoke for UI/AppleScript surfaces.
+- The Hammerspoon **host** (init.lua, products.lua) + product symlinks.
+- ctx-lenses shell integration (`.zsh/tools/ctx.zsh`).
 
-## Out of scope
+## Out of scope (this repo)
 
-- Cross-machine sync of user data (`workspace-notes.json`, `space-profiles/`). Those stay in `~/.hammerspoon/` and aren't in the repo.
+- The Spaces product itself — that's in `~/spaces/hs-spaces/hs-spaces/main/`. Edit there; dotfiles symlinks pull it in. See that repo's `memory_bank/` for product-specific context.
+- Cross-machine sync of user data (`workspace-notes.json`, `space-profiles/`). Those stay in `~/.hammerspoon/`.
 - Linux desktop automation.
-- App-specific configs the dotfiles flow can't reach (e.g. iTerm preferences plist).
 
 ## Success
 
 - Fresh machine productive in < 30 minutes via `bootstrap.sh`.
 - Shell startup < 100ms.
-- Hammerspoon products load with no console errors and work without an IDE in the loop.
-- Agent activity visible at a glance from the macOS menubar.
+- Hammerspoon products load with no console errors.
+- Adding a new product is "drop a repo, symlink, add to products.lua".

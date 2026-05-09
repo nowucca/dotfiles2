@@ -1,87 +1,47 @@
-# Progress - Dotfiles
+# Progress — Dotfiles
 
-## Spaces v1 (shipped, on `feat/spaces-v1`)
+## State
 
-Branded Hammerspoon-hosted desktop product for running long-running agents from native macOS. Replaced the unbranded `.hammerspoon/modules/` toolkit with a deliberate product layout.
-
-### v1 task ledger (all complete)
-
-| # | Task | Commit |
-|---|------|--------|
-| 1  | Test harness + spaces/ skeleton | `0495b81` |
-| 2  | core/config.lua | `2339004` |
-| 3  | core/log.lua | `2a0e122` |
-| 4  | core/data.lua (with `agentCwds`) | `8c8f762` + `bec25a3` (lifted-label fix) |
-| 5  | core/agents.lua title parser | `193eac4` |
-| 6  | core/iterm.lua snapshot | `72099c3` + `5258540` (space-resolve fix) |
-| 7  | core/iterm.lua window/tab create + focus | `d042676` |
-| 8  | core/chrome.lua | `3dd457b` |
-| 9  | core/agents.lua state map + polling | `98ff428` |
-| 10 | actions/labels.lua + ui/banner.lua | `8fac0fe` |
-| 11 | ui/switcher.lua | `5ea09c6` |
-| 12 | actions/space-manager.lua | `b973e11` |
-| 13 | actions/profiles.lua | `322c106` |
-| 14 | actions/launcher.lua (agent launchers + cwd recents) | `3712136` |
-| 15 | ui/about.lua | `eebf6a1` |
-| 16 | ui/menubar.lua (nested Space → Window → Tab) | `38436b1` |
-| 17 | spaces/init.lua + zsh shim | `faba323` |
-| 18 | Cutover (host init + delete modules/) | `35e43cf` |
-
-### Post-launch fixes
-
-| Fix | Commit |
-|-----|--------|
-| Always-visible menubar widget (text glyph fallback when SF Symbol unavailable), 5s/30s polling, drop window-focus filter | `6f3f5f2` |
-| Menu builds from cached agent state instead of live snapshot | `1094119` |
-| iTerm snapshot async via `hs.task` so polling never blocks main thread | `d02e9e3` |
-
-### Test suite
-
-71 tests across `test_config`, `test_log`, `test_data`, `test_agents_parser`, `test_agents_state`. Runs in <100ms via `hs -c "dofile(hs.configdir .. '/spaces/test/run_all.lua')"`. Test harness force-clears cached `core/ui/actions` modules so edited code lands immediately.
-
-UI/AppleScript surfaces (iterm, chrome, menubar, dialogs) are not unit-tested — verified manually via smoke tests in each task.
-
-### Acceptance state
-
-| Criterion | Status |
+| Component | Status |
 |-----------|--------|
-| Hammerspoon reloads cleanly | ✅ |
-| `~/.hammerspoon/modules/` removed | ✅ |
-| `~/.hammerspoon/spaces/` exists | ✅ |
-| `workspace-notes.json` + `space-profiles/` preserved | ✅ |
-| Menubar widget visible | ✅ (fallback glyph; SF Symbol doesn't load) |
-| Menu opens fast | ✅ (post-fix: cached state + async polling) |
-| `_G.ws.spaces.config.brand.version == "1.0.0"` | ✅ |
-| ⌘⌃A new agent space (live test) | not yet user-confirmed |
-| ⌘⌃⇧A new agent tab here (live test) | not yet user-confirmed |
-| Existing hotkeys (⌘⌃L, ⌘⌃Space, ⌘⌃B, ⌘⌃T, etc.) unchanged | not yet user-confirmed |
-| Wrong-space-label bug | fix attempted (200ms watcher delay), unconfirmed |
+| Modular zsh config | ✅ Stable since 2026-02-09 |
+| tmux config | ✅ Stable since 2026-02-09 |
+| Hammerspoon host (init.lua, products.lua) | ✅ Cut over 2026-05-08 |
+| Spaces product | ✅ Extracted to `~/spaces/hs-spaces/`. v1 shipped, v1.5 in progress (in that repo) |
+| ctx-lenses shell integration | ✅ |
 
-## Earlier project state (still current)
+For Spaces product progress (v1 task ledger, post-launch fixes, v1.5 outstanding work, v2 deferred), see `~/spaces/hs-spaces/hs-spaces/main/memory_bank/progress.md`.
 
-### Modular zsh configuration (2026-02-09)
+## Recent dotfiles work
 
-`.zsh/{core,aliases,functions,tools,prompt.zsh,netflix.zsh}`. NVM/SDKMAN lazy loaded. Solarized tmux. All commits already on `main-zsh`.
+### 2026-05-08: Spaces extracted; dotfiles becomes host-only
 
-### Tmux
+- Moved Lua product from `.hammerspoon/spaces/` (~25 files) to its own repo
+- Replaced with absolute symlinks; `bootstrap.sh` preserves them via `rsync -al`
+- Trimmed `memory_bank/` to dotfiles-only with pointers to the new repo for product detail
+- Host `init.lua` was already in place from the v1 cutover (commit `35e43cf`)
 
-Vim navigation, `|`/`-` splits, mouse + pbcopy, Alt+1-9 window switch, Solarized.
+### 2026-05-08: Spaces v1 → main-zsh
 
-## Future work
+Merged 26 commits from `feat/spaces-v1` into `main-zsh` (fast-forward). Branch deleted.
 
-### v1.5 — Spaces own repo + manuals + skill (planned)
+### 2026-02-09: Modular zsh + tmux finalized
 
-Extract `.hammerspoon/spaces/` to a new `spaces-hs` repo with:
-- `manual/` — manuals v2 site (install, state convention, shim, troubleshooting)
-- `.claude/skills/spaces.md` — installable Claude skill
-- `install.sh` — clone + symlink + source
+- `.zsh/{core,aliases,functions,tools,prompt.zsh,netflix.zsh}` structure
+- NVM/SDKMAN lazy-loaded
+- tmux with vim navigation, splits, mouse, Solarized
 
-### v2 — Notifications, templates (deferred)
+## Outstanding
 
-- Native banner on `run → done/wait/err`. Click → switch space + focus tab.
-- Templated launchers from user-editable JSON.
-- iTerm side-panel/status-bar integration.
-- Sourcegraph/Slack/JIRA integration from menubar.
+### Cleanup
+
+- [ ] Push `main-zsh` to origin (30+ commits ahead currently)
+- [ ] Eventually delete the design history at `docs/superpowers/{specs,plans}/2026-05-08-spaces-*` if the canonical copy in the hs-spaces repo is sufficient — leaving for now as a historical record of when/where the design happened
+
+### Future enhancements
+
+- [ ] tmux plugin manager (TPM) for resurrect/continuum — unconfirmed if worth the dependency
+- [ ] Async git prompt for even faster rendering on huge repos
 
 ## Testing checklist for any zsh change
 
@@ -90,10 +50,20 @@ Extract `.hammerspoon/spaces/` to a new `spaces-hs` repo with:
 3. Spot-check aliases: `ll`, `..`, `g status`
 4. Lazy load: `node --version` (triggers NVM)
 
-## Testing checklist for any Spaces change
+## Testing checklist for any Hammerspoon host change
 
 1. `./bootstrap.sh -f`
 2. `hs -c "hs.reload()"`
-3. `hs -c "dofile(hs.configdir .. '/spaces/test/run_all.lua')"` — 71 tests, 0 failures
-4. Click the menubar — should pop instantly
-5. `_G.ws.spaces.agents.summary()` after a few seconds — should show idle count
+3. `hs -c "_G.ws.spaces.config.brand.version"` — should print `1.0.0`
+
+For Spaces product testing, see that repo's `memory_bank/progress.md`.
+
+## Timeline
+
+| Date | Milestone |
+|------|-----------|
+| 2026-02-06 | Hammerspoon modular architecture (original `modules/`) |
+| 2026-02-09 | Shell + tmux modular config |
+| 2026-05-08 | Spaces v1 designed, planned, implemented (18 tasks), cutover |
+| 2026-05-08 | Spaces v1 polish: visibility, async polling, cached menu |
+| 2026-05-08 | Merged to `main-zsh`; extracted to `~/spaces/hs-spaces/` |

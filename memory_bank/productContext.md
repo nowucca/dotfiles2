@@ -1,61 +1,37 @@
-# Product Context
+# Product Context — Dotfiles
 
 ## Why this repo
 
-Two intertwined goals:
+A personal dotfiles repo with two responsibilities:
 
-1. **Portable shell + dev environment.** Consistent zsh, tmux, git config across machines. New machine gets productive fast via `bootstrap.sh`.
-2. **Native macOS desktop for agentic work.** Long-running AI agents (Claude Code, others) deserve a first-class operator surface. Not an IDE — the menubar, spaces, and choosers that macOS already provides, with the right glue.
+1. **Portable dev environment.** Consistent zsh, tmux, git config across machines. New machine gets productive fast via `bootstrap.sh`.
+2. **Hammerspoon host for desktop products.** The `.hammerspoon/` directory is a thin multi-product host. Products live in their own repos under `~/spaces/`; dotfiles symlinks them in.
 
-## The Spaces product
+## User stories — dotfiles side
 
-### Problem
+- *I'm setting up a new machine.* Clone, run `./bootstrap.sh -f`, get productive in 30 minutes.
+- *I want to update an alias.* Edit in `.zsh/aliases/`, run bootstrap, reload shell.
+- *I added a new Hammerspoon product.* Symlink it under `.hammerspoon/`, add to `products.lua`, reload.
+- *Slow shell startup.* Profile via `time zsh -i -c exit`; usual suspects are non-lazy tool init.
 
-Running multiple AI agents simultaneously means juggling iTerm tabs across many macOS Spaces. There's no native way to:
+For Spaces product user stories, see `~/spaces/hs-spaces/hs-spaces/main/memory_bank/productContext.md`.
 
-- See which agents are running where, and what state they're in.
-- Jump from a notification to the specific tab that needs attention.
-- Spin up a new agent in a fresh, labelled space without manual setup.
-- Keep the agent surface and the rest of macOS distinct.
+## UX goals — shell
 
-Without dedicated tooling, the operator either keeps an IDE focused (which is its own context switch) or loses track of agents.
+- Shell startup < 100ms.
+- Aliases short and memorable.
+- Powerful navigation (z, directory shortcuts).
+- Git status in prompt; fast mode for huge repos.
+- Tools that are slow at init (NVM, SDKMAN) lazy-load on first use.
 
-### Solution
+## UX goals — Hammerspoon host
 
-A branded Hammerspoon product that:
-
-- Surfaces agent state in the menubar using a tab-title convention agents emit (`[spaces:STATE] task`). State map updated by background polling — UI never blocks on AppleScript.
-- Provides two fixed launchers:
-  - `⌘⌃A` — new labelled space + iTerm with `claude` running in a chosen cwd.
-  - `⌘⌃⇧A` — new tab on current space + `claude` in a chosen cwd.
-- Preserves the existing space-management workflow (label, switch, save/restore profiles, create/close spaces) the user already has muscle memory for.
-- Ships with a tiny zsh shim (`spaces_state run/wait/done/err`) so agent runners can announce state in one line.
-
-### User stories
-
-- *I'm running three Claude agents on three spaces. I glance at the menubar and see one is awaiting input.* (Click-to-focus targeted at v2.)
-- *I want to start a new agent on a fresh space.* `⌘⌃A`, type a label, pick a cwd from recents, hit return.
-- *I'm reviewing a PR in one tab and want a new agent in a new tab on this same space.* `⌘⌃⇧A`.
-- *I have a complex space layout I want back later.* Save profile, restore later.
-
-### What ships in v1
-
-Branding polish (name, glyph, voice, About dialog, version, quiet logging), agent run tracking via tab-title parsing, the two launchers, the cleaned-up product folder layout. v1.5 will extract the product to its own repo with a manuals v2 site and an installable Claude skill. v2 brings native notifications and templated launchers.
-
-### What doesn't ship in v1
-
-Agent notifications (deferred to v2), templated launchers (v2), iTerm side-panel integration, multi-machine sync.
-
-## User experience goals
-
-- **The menubar is the surface.** Always visible. Click to expand to current space → windows → tabs. Click a tab to focus it.
-- **Voice is workmanlike.** "Spinnaker ready", "Closed Spinnaker · 4 windows", "No active space". No emoji, no exclamations.
-- **Native everywhere.** macOS Spaces, hs.alert, hs.dialog, hs.chooser. No web views, no Electron.
-- **Quiet by default.** Hammerspoon console at info level shows the start-up line and nothing else under normal use.
+- Adding a product is mechanical (drop a folder/symlink, add a name to `products.lua`).
+- Reload via `hs.reload()` cleanly tears down and rebuilds — no leaked watchers or widgets.
+- The host stays small (~37 lines).
 
 ## Success metrics
 
-- Operator can run 3+ agents without losing track of any.
-- New agent spun up in under 5 seconds.
-- Menubar opens instantly (< 50ms) regardless of agent load.
-- Polling cost invisible — main thread never blocks on AppleScript.
+- Fresh machine productive: < 30 min.
+- Shell startup: < 100ms (verified by `time zsh -i -c exit`).
+- Hammerspoon products load without errors at info level.

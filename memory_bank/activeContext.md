@@ -1,70 +1,41 @@
-# Active Context - Dotfiles
+# Active Context — Dotfiles
 
 ## Current focus
 
-**Spaces v1 — shipped, in post-launch polish.** Branded Hammerspoon-hosted product for running long-running agents from native macOS. Layout cut over from flat `modules/` to product folder layout. Currently on branch `feat/spaces-v1` (~22 commits off `main-zsh`), not yet merged.
+Hammerspoon Spaces product **extracted to its own repo** at `~/spaces/hs-spaces/hs-spaces/main/`. Dotfiles serves as the host: tiny `init.lua` + `products.lua`, with `.hammerspoon/spaces` and `.zsh/tools/spaces.zsh` as symlinks into the new repo.
 
-## Recent decisions
+For active work on the Spaces product itself, see that repo's `memory_bank/activeContext.md`.
 
-### 2026-05-08: Async AppleScript via hs.task
+## Recent decisions (dotfiles-side)
 
-`hs.osascript.applescript()` is synchronous and blocks Hammerspoon's main thread. With many iTerm tabs the snapshot took ~1.5s and made the menubar feel frozen ~30% of the time (whenever a click coincided with the polling refresh). Switched `core/iterm.lua`'s `snapshotAsync` to use `hs.task.new("/usr/bin/osascript", cb, {"-e", script})`. Main thread now non-blocking; agents poll without disrupting UI.
+### 2026-05-08: Spaces extraction → symlinks
 
-This is now the standard pattern for any AppleScript that iterates collections — see `systemPatterns.md`.
+Lua product moved out of dotfiles into `~/spaces/hs-spaces/hs-spaces/main/hammerspoon/spaces/`. Dotfiles' `.hammerspoon/spaces` is now an absolute-path symlink. `bootstrap.sh` preserves symlinks via `rsync -al`. First-time cutover required `rm -rf ~/.hammerspoon/spaces` so rsync could lay down the symlink (rsync without `--delete` won't replace a directory with a symlink).
 
-### 2026-05-08: Menu builds from cached agent state only
+### 2026-05-08: Multi-product Hammerspoon host
 
-`buildMenu` runs on every menubar click. Calling `iterm.snapshot()` from there made the menu pop slowly even after polling went async. Cached records (`agents.forSpace`) now carry `tabIndex` so the menubar builds purely from in-memory state. Tradeoff: tab list reflects last poll (5s window).
+`.hammerspoon/init.lua` is a ~37-line host. `products.lua` lists product folder names; the host loads each, calls `start()`. `hs.shutdownCallback` calls each `stop()` on Hammerspoon exit.
 
-### 2026-05-08: Spaces product layout
+Currently `products.lua` lists only `spaces`. Adding a future product is mechanical: drop a folder/symlink, add to the list.
 
-`.hammerspoon/{init.lua, products.lua, spaces/}`. `spaces/` has `core/`, `ui/`, `actions/`, `test/`. Old `modules/` is deleted. Future products plug into `products.lua` as siblings.
+### 2026-02-09: Modular zsh config
 
-### 2026-05-08: iTerm AppleScript reality check
+`.zsh/{core,aliases,functions,tools,prompt.zsh,netflix.zsh}`. Lazy-loaded NVM/SDKMAN. Auto-source loop picks up `.zsh/tools/*.zsh` (so the Spaces shim drops in without explicit sourcing).
 
-Plan's draft AppleScript hit three quirks during implementation:
-- Tabs have no `id` property — address by 1-based **index**.
-- Session has `name` (not `title`).
-- Sessions have stable `unique ID` strings — used as the snapshot's tab `id` because tabs themselves don't have stable identifiers.
+## Patterns
 
-`core/iterm.lua` reflects these. Anything else that scripts iTerm should follow the same conventions.
+For dotfiles-side patterns (zsh modules, lazy loading, host setup, ctx-lenses integration), see `systemPatterns.md` here.
 
-### 2026-05-08: SF Symbols don't load on this Hammerspoon
-
-`hs.image.imageFromName("symbol://square.stack.3d.up.fill")` returns nil here despite Hammerspoon 1.1.1 supposedly supporting it. Menubar uses a text glyph fallback (`▤`). Not pretty but always visible. Potential future fix: ship a small PNG/PDF asset in `spaces/assets/`.
-
-## Patterns to follow
-
-**For Hammerspoon AppleScript:** Use `hs.task` async whenever iterating macOS collections. See `systemPatterns.md` for the exact shape.
-
-**For agent-aware features:** Read the title-state convention. The state map in `core/agents.lua` is the source of truth, not iTerm.
-
-**For new Hammerspoon products:** Put under `.hammerspoon/<product>/`, add to `products.lua`, export `start()`/`stop()`. Don't reach into another product's modules.
+For Spaces product patterns (architecture, async AppleScript, iTerm quirks, module conventions), see `~/spaces/hs-spaces/hs-spaces/main/memory_bank/systemPatterns.md`.
 
 ## Open items
 
-### Bugs to verify after current Hammerspoon session
-
-- "Wrong space label in menubar" reported during initial v1 testing. Fix attempt: 200ms delay on space-watcher updates before reading `currentSpaceId()`. **Not yet confirmed** the lag was the actual cause vs. a multi-screen issue (focused-window-screen vs main-screen). If it persists, switch `currentSpaceId` to use `screen.mainScreen()` consistently.
-
-### v1.5 (planned, not started)
-
-Extract Spaces to its own repo `spaces-hs`. Companion artefacts:
-- Manuals v2 site under `manual/`
-- Installable Claude skill (`.claude/skills/spaces.md` or plugin)
-- `install.sh` clones, symlinks `~/.hammerspoon/spaces`, sources the zsh shim
-
-Dotfiles `.hammerspoon/spaces` becomes a symlink/submodule.
-
-### v2 (deferred)
-
-- Native banner notifications on agent state transitions (run → done/wait/err). Click notification → switch to space + focus the specific iTerm tab.
-- Templated launchers (user-editable `agent-templates.json`).
+- Push `hs-spaces` repo to Netflix GHE (target host for the new repo).
+- v1.5 Spaces work: manuals v2 site (`<hs-spaces>/manual/`), installable Claude skill (`<hs-spaces>/skill/`).
+- Push dotfiles to remote (currently 30+ commits ahead of `origin/main-zsh`).
 
 ## Quick references
 
-- Spec: `docs/superpowers/specs/2026-05-08-spaces-product-design.md`
-- Plan: `docs/superpowers/plans/2026-05-08-spaces-v1.md`
-- Test runner: `hs -c "dofile(hs.configdir .. '/spaces/test/run_all.lua')"` (currently 71 tests)
-- Console debug namespace: `_G.ws.spaces.{config,log,agents,iterm,labels,...}`
-- Branch: `feat/spaces-v1` off `main-zsh`. Not pushed.
+- Hammerspoon product (Spaces): `~/spaces/hs-spaces/hs-spaces/main/`
+- Spaces design history (kept here for archival): `docs/superpowers/{specs,plans}/`
+- Branch: `main-zsh`. Ahead of origin by 30+ commits as of latest push.

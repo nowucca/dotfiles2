@@ -1,184 +1,69 @@
-# Hammerspoon — Spaces product feature reference
+# Hammerspoon — features and host
 
-Quick reference for the Spaces v1 product (`.hammerspoon/spaces/`). For architecture see `systemPatterns.md`; for current state see `activeContext.md`.
+## Spaces product
 
-## Hotkeys
+The Spaces product (menubar, agent state tracking, launchers, hotkeys) lives in **`~/spaces/hs-spaces/hs-spaces/main/`**. For full feature reference (hotkeys, menubar layout, state convention, console namespace, troubleshooting), see that repo's:
 
-| Hotkey | Action |
-|--------|--------|
-| `⌘⌃A` | **New agent space** — prompt label + cwd, create space, launch iTerm with `claude` |
-| `⌘⌃⇧A` | **New agent tab here** — pick cwd, add tab to current iTerm window with `claude` |
-| `⌘⌃L` | Show current space's label as banner |
-| `⌘⌃⇧L` | Set or update current space's label |
-| `⌘⌃Space` | Open space switcher chooser |
-| `⌘⌃N` | App launcher chooser (Chrome / iTerm) |
-| `⌘⌃B` | Open Chrome on current space |
-| `⌘⌃T` | Open iTerm on current space |
-| `⌘⌃S` | Save current space as profile |
-| `⌘⌃R` | Restore profile to current space |
-| `⌘⌃⇧N` | Create new space (labelled, with iTerm + Chrome) |
-| `⌘⌃⇧C` | Close current space (with confirmation) |
+- `README.md` — install + hotkeys + state convention + layout
+- `memory_bank/systemPatterns.md` — architecture, async AppleScript pattern, module responsibilities
+- `memory_bank/techContext.md` — Hammerspoon API surface, iTerm quirks, performance targets
 
-## Tab-title state convention
+Edit either side of the symlink; both reflect.
 
-Agents announce state by writing the OS title via OSC 0/2:
+## Dotfiles host (this repo)
 
-```
-\033]0;[spaces:STATE] FREEFORM\007
-```
-
-States: `idle`, `run`, `wait`, `done`, `err`. Tabs without the prefix render as `idle`.
-
-Shell shim auto-loaded from `~/.zsh/tools/spaces.zsh`:
-
-```zsh
-spaces_state run "task name"
-spaces_state wait
-spaces_state done
-spaces_state err
-```
-
-## Menubar layout
-
-Widget title: SF Symbol icon (when available) + current space's label + dot badge if running/waiting agent on this space. Without the SF Symbol, falls back to a `▤` text glyph.
-
-Click opens:
-
-```
-▶ <current space>  (current)            ← inline-expanded
-   ▶ iTerm — Window 1
-       ● task title
-       ◐ another task
-         shell
-   ▶ iTerm — Window 2
-       ○ done: deploy-check
-   <other space>                        ← click to switch
-   <other space>
-─────
-New agent space…           ⌘⌃A
-New agent tab here         ⌘⌃⇧A
-─────
-Set Label…                 ⌘⌃⇧L
-New Space                  ⌘⌃⇧N
-Close Space                ⌘⌃⇧C
-─────
-Open Chrome                ⌘⌃B
-Open iTerm                 ⌘⌃T
-─────
-Profiles ▸
-Manage Labels ▸
-─────
-About Spaces…
-```
-
-State badges in tab rows:
-
-| State | Glyph |
-|-------|-------|
-| `run` | `●` |
-| `wait` | `◐` |
-| `done` | `○` |
-| `err` | `✕` |
-| `idle` / shell | `·` |
-
-Click a tab row → switches to its space + focuses that tab via iTerm AppleScript.
-
-## Console debug namespace
+`.hammerspoon/init.lua` is a thin host (~37 lines):
 
 ```lua
-_G.ws.spaces.config        -- brand, paths, poll cadence
-_G.ws.spaces.log           -- log.info/debug/warn/error/try
-_G.ws.spaces.agents        -- summary(), forSpace(sid), get(s,w,t)
-_G.ws.spaces.iterm         -- snapshot(), snapshotAsync(cb), newWindow, newTab, focusTab
-_G.ws.spaces.labels        -- getCurrentLabel, set, clear, prune, rebind
-_G.ws.spaces.switcher      -- getSpacesForCurrentScreen, gotoSpace, show
-_G.ws.spaces.banner        -- show
-_G.ws.spaces.manager       -- createNewSpace, confirmCloseCurrentSpace
-_G.ws.spaces.profiles      -- saveCurrentSpace, restoreProfile, listProfiles
-_G.ws.spaces.launcher      -- newAgentSpace, newAgentTabHere, openChrome, openITerm
-_G.ws.spaces.menubar       -- widget control, update()
+require("hs.ipc")
+package.path = hs.configdir .. "/?/init.lua;" .. hs.configdir .. "/?.lua;" .. package.path
+
+local productNames = require("products")
+for _, name in ipairs(productNames) do
+  package.path = hs.configdir .. "/" .. name .. "/?.lua;"
+              .. hs.configdir .. "/" .. name .. "/?/init.lua;"
+              .. package.path
+end
+
+local loaded = {}
+for _, name in ipairs(productNames) do
+  local ok, mod = pcall(require, name)
+  if ok and mod and type(mod.start) == "function" then
+    mod.start()
+    table.insert(loaded, mod)
+  else
+    print("[host] failed to load product '" .. name .. "': " .. tostring(mod))
+  end
+end
+
+hs.shutdownCallback = function()
+  for _, mod in ipairs(loaded) do
+    if type(mod.stop) == "function" then pcall(mod.stop) end
+  end
+end
 ```
 
-Useful queries:
+`.hammerspoon/products.lua` lists product folder names:
 
 ```lua
--- What's the agent state map look like?
-_G.ws.spaces.agents.summary()
--- → { run = N, wait = N, done = N, err = N, idle = N }
-
--- All agents on the current space
-local sid = _G.ws.spaces.agents.summary  -- placeholder; use snippet below
-hs.fnutils.imap(_G.ws.spaces.agents.forSpace(sid), function(r)
-  return r.title .. " [" .. r.state .. "]"
-end)
-
--- Force a snapshot synchronously (for one-off inspection)
-local s = _G.ws.spaces.iterm.snapshot()
-print(#s.windows .. " windows")
-
--- Reload menubar title
-_G.ws.spaces.menubar.update()
+return { "spaces" }
 ```
 
-## File data
+`.hammerspoon/spaces` is an absolute symlink into `~/spaces/hs-spaces/hs-spaces/main/hammerspoon/spaces`.
 
-User data lives in `~/.hammerspoon/` and is **not** synced from the repo:
+## Adding a new product
 
-- `workspace-notes.json` — labels, space → label mapping, agent cwd recents (LRU, max 10)
-- `space-profiles/<name>.json` — saved profiles (one per file)
+1. Create the new product repo under `~/spaces/<name>/<name>/main/`.
+2. Lay out `hammerspoon/<name>/init.lua` exporting `start()` and `stop()`.
+3. From dotfiles: `ln -s /Users/satkinson/spaces/<name>/<name>/main/hammerspoon/<name> .hammerspoon/<name>`.
+4. Add `"<name>"` to `.hammerspoon/products.lua`.
+5. `./bootstrap.sh -f && hs -c "hs.reload()"`.
 
-Schema for `workspace-notes.json`:
+## Host-side troubleshooting
 
-```json
-{
-  "labels":   { "Spinnaker": { "lastUsed": 1746728000 }, ... },
-  "spaces":   { "12345": "Spinnaker", ... },
-  "agentCwds": ["/Users/.../Work/...", "..."]
-}
-```
-
-## Common operations
-
-### Add an existing agent space to the menubar
-
-Just label the space (`⌘⌃⇧L`). Agent state appears automatically once the agent starts emitting `[spaces:run] ...` titles.
-
-### Disable agent polling temporarily
-
-```lua
-_G.ws.spaces.agents.stop()
--- ... do stuff ...
-_G.ws.spaces.agents.start()
-```
-
-### Tune polling cadence
-
-Edit `core/config.lua` `poll.foregroundSec` / `poll.backgroundSec`, then `./bootstrap.sh -f && hs -c "hs.reload()"`.
-
-### Diagnose slow menu
-
-Time the build path:
-
-```lua
-local t0 = hs.timer.absoluteTime()
-_G.ws.spaces.menubar.update()
-print(string.format("%.1f ms", (hs.timer.absoluteTime() - t0) / 1e6))
-```
-
-## Troubleshooting
-
-| Symptom | Check |
-|---------|-------|
-| Menubar widget invisible | SF Symbol failed to load AND no label — fallback glyph should appear; if not, check the title-building code paths |
-| Menu opens slowly | `iterm.snapshot()` (sync) called on the build path? It shouldn't be — see `systemPatterns.md` async pattern |
-| Agent state doesn't update | Polling stopped? Run `_G.ws.spaces.agents.summary()` and confirm non-zero counts; check `agents.start()` was called |
-| Wrong space label briefly shown after switch | Space-watcher fires before focus settles; 200ms `timer.doAfter` delay is in place |
-| Tab title overwritten by shell | iTerm's shell integration sets the title on every prompt; emit your OSC escape from inside the shell instead of via `set name` |
-
-## Changes from the old `modules/` layout (deleted in v1)
-
-- `modules/` folder gone; product lives in `spaces/{core,ui,actions}/`.
-- Five duplicate `findAndMoveNewWindow*` loops collapsed into `core/iterm.lua` and `core/chrome.lua`.
-- Console namespace moved from flat `ws.labels` etc. to `ws.spaces.<module>`.
-- `ws.menubar.update()` → `_G.ws.spaces.menubar.update()`.
-- All `print()` debug chatter routed through `core/log.lua` (default level info).
+| Symptom | Likely cause |
+|---------|--------------|
+| Product not loading | Check `_G.ws.<name>` in console; if nil, look for `[host] failed to load product` line on Hammerspoon startup |
+| Symlink replaced by real dir after bootstrap | bootstrap created a real dir before the symlink existed in the repo. `rm -rf ~/.hammerspoon/<name>` then bootstrap |
+| Product files edited but changes don't apply | `hs.reload()` after edit. If `package.loaded` is sticky, the product's own test runner usually clears caches; reload is the host-level reset |
+| Two menubar widgets | Old + new product both running. Confirm only the new is in `products.lua`; restart Hammerspoon |
