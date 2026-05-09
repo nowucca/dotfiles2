@@ -68,14 +68,16 @@ function M.snapshot()
     end
   end
 
-  -- Resolve hs.screen and space ID for each window via Hammerspoon.
+  -- Resolve hs.screen and space ID for each window. Note: hs.window.get(id)
+  -- only returns a window object for windows Hammerspoon currently tracks
+  -- (Stage Manager + inactive-space windows are often hidden from it). But
+  -- hs.spaces.windowSpaces accepts the raw window ID and works regardless,
+  -- so we ask it directly for the space attribution.
   for _, w in ipairs(windows) do
+    local sps = spaces.windowSpaces(w.id) or {}
+    w.space = sps[1]
     local hsWin = windowMod.get(w.id)
-    if hsWin then
-      w.screen = hsWin:screen()
-      local sps = spaces.windowSpaces(w.id) or {}
-      w.space = sps[1]
-    end
+    if hsWin then w.screen = hsWin:screen() end
   end
 
   return { windows = windows }
