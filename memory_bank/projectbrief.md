@@ -1,44 +1,50 @@
 # Dotfiles Project Brief
 
 ## Overview
-Personal dotfiles repository for macOS configuration, shell setup, and development tools.
 
-## Core Objectives
-1. **Portable Configuration** - Consistent dev environment across machines
-2. **Version Controlled** - Track changes and history of all config files
-3. **Easy Setup** - Bootstrap new machines quickly with `bootstrap.sh`
-4. **Modular** - Each tool's config is self-contained
+Personal dotfiles repository for macOS configuration, shell setup, and Hammerspoon-hosted desktop products. The repo holds the source of truth; `bootstrap.sh -f` rsyncs it to `~/`.
 
-## Key Components
+## Components
 
-### Shell Configuration
-- `.zshrc`, `.zshenv` - Zsh shell configuration
-- `.aliases` - Command shortcuts
-- `.functions` - Shell functions
-- `.exports` - Environment variables
-- `.path` - PATH configuration
+### Shell
 
-### Development Tools
-- `.gitconfig` - Git configuration
-- `.vimrc` - Vim configuration
-- `.editorconfig` - Editor settings
+`.zshrc`, `.zshenv`, `.tmux.conf`, and the modular `.zsh/` tree (`core/`, `aliases/`, `functions/`, `tools/`, `prompt.zsh`, `netflix.zsh`). No oh-my-zsh; lazy-loaded NVM/SDKMAN; fast git-aware prompt.
 
-### macOS Automation
-- `.hammerspoon/` - Hammerspoon configuration for space labeling and workspace management
+### Hammerspoon products
 
-### Scripts
-- `bin/` - Utility scripts
-- `bootstrap.sh` - Initial setup script
-- `brew.sh` - Homebrew package installation
-- `install.sh` - Symlink creation
+`.hammerspoon/` is a multi-product host. `init.lua` (~37 lines) loads each product listed in `products.lua` and calls its `start()`/`stop()`. Each product owns its menubar widget and lifecycle.
 
-## Project Constraints
-- macOS-focused (some configs may work on Linux)
-- Zsh as primary shell
-- Uses symlinks from dotfiles repo to home directory
-- Private/sensitive data in `.netflix-extra` (not committed)
+**Spaces** (v1, current): branded macOS-native shell for running long-running AI agents. Tab-title state convention surfaces agent state in the menubar; two hotkeys spawn agents into new spaces or new tabs.
 
-## Success Criteria
-- New machine can be set up in under 30 minutes
-- All personal preferences and shortcuts available
-- Hammerspoon space labeling works reliably
+Future products plug in as siblings (e.g. `spaces-hs`, `clipboard`, etc.) by dropping a folder under `.hammerspoon/` and adding the name to `products.lua`.
+
+### Dev tools
+
+`.gitconfig`, `.vimrc`, `.editorconfig`, plus `bin/` utility scripts.
+
+## Constraints
+
+- macOS-only for Hammerspoon products. Shell config aims to also work on Linux.
+- Zsh as primary shell.
+- `bootstrap.sh -f` uses rsync **without** `--delete` — removing a file from the repo doesn't remove it from `~/`. Explicit `rm` required when retiring directories.
+- Sensitive data in `.netflix-extra` (gitignored).
+
+## In scope
+
+- Shell config (zsh, tmux, prompt) and aliases/functions.
+- Git config and editor config.
+- Hammerspoon products that orchestrate macOS Spaces, agents, and apps.
+- Pure-Lua tests for product modules; manual smoke for UI/AppleScript surfaces.
+
+## Out of scope
+
+- Cross-machine sync of user data (`workspace-notes.json`, `space-profiles/`). Those stay in `~/.hammerspoon/` and aren't in the repo.
+- Linux desktop automation.
+- App-specific configs the dotfiles flow can't reach (e.g. iTerm preferences plist).
+
+## Success
+
+- Fresh machine productive in < 30 minutes via `bootstrap.sh`.
+- Shell startup < 100ms.
+- Hammerspoon products load with no console errors and work without an IDE in the loop.
+- Agent activity visible at a glance from the macOS menubar.

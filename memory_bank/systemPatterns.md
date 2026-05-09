@@ -1,62 +1,128 @@
 # System Patterns - Dotfiles
 
-## Shell Configuration Architecture
+## Repo layout
 
-### Directory Structure
 ```
 ~/Work/dotfiles/
-├── .zshrc              # Main loader (modular)
-├── .zshenv             # Environment variables (SINGLE SOURCE OF TRUTH)
-├── .tmux.conf          # Tmux configuration
-├── .zsh/               # Modular configuration directory
-│   ├── README.md       # Documentation
-│   ├── core/           # Core shell settings
-│   │   ├── options.zsh     # setopt, bindkey
-│   │   ├── path.zsh        # PATH (single source of truth)
-│   │   ├── history.zsh     # History configuration
-│   │   └── completions.zsh # Completion system with caching
-│   ├── aliases/        # Organized by topic
-│   │   ├── navigation.zsh  # .., cd shortcuts
-│   │   ├── general.zsh     # Basic shell aliases
-│   │   ├── macos.zsh       # macOS-specific (colors, Finder)
-│   │   ├── dev.zsh         # Development (Java, Maven, Gradle)
-│   │   ├── git.zsh         # Git aliases
-│   │   ├── hammerspoon.zsh # Hammerspoon shortcuts
-│   │   └── tmux.zsh        # Tmux session management
-│   ├── functions/      # Shell functions
-│   │   ├── utils.zsh       # mkd, fs, targz, etc.
-│   │   └── network.zsh     # digga, getcertnames, server
-│   ├── tools/          # External tool integration
-│   │   ├── z.zsh           # Directory jumping
-│   │   ├── nvm.zsh         # Node (lazy loaded)
-│   │   └── sdkman.zsh      # SDKMAN (lazy loaded)
-│   ├── prompt.zsh      # Git-aware prompt with fast mode
-│   └── netflix.zsh     # Work-specific config
-├── .hammerspoon/       # macOS automation
-│   ├── init.lua
-│   └── modules/
-└── bootstrap.sh        # Machine setup script
+├── .zshrc, .zshenv, .tmux.conf
+├── .zsh/                       # modular zsh config
+│   ├── core/                   # options, path, history, completions
+│   ├── aliases/                # nav, general, macos, dev, git, hammerspoon, tmux
+│   ├── functions/              # utils, network
+│   ├── tools/                  # z, nvm, sdkman (lazy loaded), ctx, spaces
+│   ├── prompt.zsh, netflix.zsh
+├── .hammerspoon/               # Hammerspoon host + products (see below)
+├── docs/superpowers/{specs,plans}/
+├── memory_bank/                # this directory
+├── bin/                        # utility scripts
+└── bootstrap.sh                # rsyncs repo to ~/ (no --delete)
 ```
 
-### Loading Order
-1. `.zshenv` - Environment variables (all shell types)
-2. `.zshrc` - Interactive shells only:
-   - Platform detection functions (`is_mac`, `is_linux`, `is_coder_workspace`)
-   - Core modules (path, history, options, completions)
-   - Tools (z, nvm stub, sdkman stub)
-   - Prompt
-   - Aliases
-   - Functions
-   - Netflix config
-   - Local `~/.extra` overrides
+## Hammerspoon host + products
 
-## Performance Patterns
+Multi-product layout. `init.lua` is a thin host (~37 lines) that loads each product listed in `products.lua` and calls its `start()`. `hs.shutdownCallback` calls each product's `stop()` on exit.
 
-### Lazy Loading
-Slow tools are lazy-loaded - only initialized on first use:
+```
+~/.hammerspoon/
+├── init.lua             # host
+├── products.lua         # `return { "spaces" }`
+└── spaces/              # the Spaces product
+    ├── init.lua         # start/stop, hotkey registration, ws.spaces namespace
+    ├── core/            # config, log, data, iterm, chrome, agents
+    ├── ui/              # menubar, switcher, banner, about
+    ├── actions/         # labels, space-manager, profiles, launcher
+    └── test/            # _helpers, run_all, test_*.lua
+```
+
+Each product owns its own menubar widget and watcher lifecycle. Adding a new product: drop a folder under `.hammerspoon/`, add the name to `products.lua`, ensure the module exports `start()`/`stop()`.
+
+## Async AppleScript pattern (load-bearing)
+
+**Why:** `hs.osascript.applescript(script)` runs synchronously on Hammerspoon's main thread. While it's running the menubar, choosers, hotkeys, and timers are all frozen. Querying many iTerm objects (10 windows × 30 tabs ≈ 1500 property lookups) easily takes 1–2 seconds. Polling at that cost makes UI feel broken.
+
+**The pattern:**
+
+```lua
+local task = require("hs.task")
+
+local function snapshotAsync(callback)
+  local function done(exitCode, stdout, stderr)
+    if exitCode ~= 0 then
+      log.warn("snapshot failed: " .. (stderr or ""))
+      callback({})
+      return
+    end
+    callback(parseRaw(stdout))
+  end
+  task.new("/usr/bin/osascript", done, { "-e", APPLESCRIPT }):start()
+end
+```
+
+`hs.task` runs `osascript` in a separate process. The Lua main thread doesn't block — UI stays responsive while the script runs. The callback fires on the main thread when the task completes.
+
+**When to apply:** any AppleScript that iterates collections of macOS objects (windows, tabs, mail messages, finder items). Anything that takes more than ~50ms is worth moving off the main thread.
+
+**Verify with timing:**
+
+```lua
+local t0 = hs.timer.absoluteTime()
+fn()
+print(string.format("%.1f ms", (hs.timer.absoluteTime() - t0) / 1e6))
+```
+
+Compare sync vs async; the async version's call should return in <5ms regardless of script duration.
+
+**Sync still has its place:** smoke tests, console debugging, one-off ad-hoc calls where you need the result inline. Keep both; agents.lua-style polling uses the async path, smoke tests use the sync path.
+
+## Spaces product patterns
+
+### Tab-title state convention
+
+Agents announce state via OSC title escape:
+
+```
+\033]0;[spaces:STATE] FREEFORM\007
+```
+
+`STATE ∈ {idle, run, wait, done, err}`. Tabs without the prefix render as `idle`. The shell shim is `~/.zsh/tools/spaces.zsh`; auto-sourced by the existing `~/.zsh/tools/*.zsh` loop in `.zshrc`. Usage:
 
 ```zsh
-# NVM lazy loading pattern (~1000ms savings)
+spaces_state run "task name"
+spaces_state done
+```
+
+`core/agents.lua` parses titles via regex `^%[spaces:(%a+)%]%s*(.*)$`. Unknown state names fall back to `idle` with raw title preserved.
+
+### Cached state map drives the menubar
+
+The menubar is opened on every click — Hammerspoon calls the `setMenu(buildMenu)` function each time. **Never** call `iterm.snapshot()` or any synchronous AppleScript from the menu build path. Build from cached agent state (`agents.forSpace(sid)`), refreshed by the polling timer.
+
+The cached record carries everything the menubar needs:
+
+```lua
+{ spaceId, winId, tabId, tabIndex, state, title, changedAt }
+```
+
+`tabIndex` is what `iterm.focusTab(winId, idx)` needs (AppleScript addresses tabs by 1-based index, not by id).
+
+### Lifecycle and watchers
+
+Each product's `start()` creates watchers, hotkeys, the menubar widget. `stop()` tears them down. The host calls `stop()` on `hs.shutdownCallback`. On `hs.reload()` the Lua state is discarded and `init.lua` re-runs from scratch — no leak.
+
+`hs.window.filter.new()` watches every window event in the system; it's heavy. Avoid unless you actually need window-focus events. The Spaces menubar uses only the spaces watcher and screen watcher.
+
+## Module conventions
+
+- One `local M = {}` ... `return M` per file. No globals.
+- Test-only API gets an underscore prefix (`M._refreshFromSnapshot`, `M._setWriter`).
+- Heavy or platform-specific imports lazy-loaded inside functions to keep tests runnable without iTerm/Hammerspoon.
+- Tests live in `<product>/test/test_*.lua`. Run with `hs -c "dofile(hs.configdir .. '/<product>/test/run_all.lua')"`. The runner force-clears cached `core/ui/actions` modules so edits land immediately.
+
+## Zsh patterns (still current)
+
+### Lazy loading
+
+```zsh
 nvm() {
     unset -f nvm node npm npx
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -64,109 +130,23 @@ nvm() {
 }
 ```
 
-### Completion Caching
-Completions compiled and cached for 24 hours:
-```zsh
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
-    compinit
-    { zcompile "${ZDOTDIR:-$HOME}/.zcompdump" } &!
-else
-    compinit -C
-fi
-```
+### Fast prompt for huge repos
 
-### Fast Git Prompt
-Large repos (Netflix, >100MB .git) skip dirty checks:
-```zsh
-# Show ⚡ instead of +!?$ status for fast mode
-if (( use_fast_mode )); then
-    s+='⚡'
-fi
-```
+`.zsh/prompt.zsh` skips dirty checks for repos with `.git` over 100MB; shows `⚡` instead of `+!?$`.
 
-### Hardcoded Paths
-Avoid slow command substitution:
+### Hardcoded paths over `eval $(... shellenv)`
+
 ```zsh
-# Instead of: eval "$(brew shellenv)"
 export HOMEBREW_PREFIX="/opt/homebrew"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 ```
 
-## Tmux Configuration
-
-### Key Bindings
-- **Prefix**: `Ctrl+A` (screen-style)
-- **Splits**: `|` horizontal, `-` vertical (stay in current path)
-- **Pane navigation**: `hjkl` (vim-style)
-- **Window switching**: `Alt+1-9` (no prefix needed)
-- **Reload**: `Ctrl+A r`
-- **Sync panes**: `Ctrl+A S` (type in all panes)
-
-### Aliases (`.zsh/aliases/tmux.zsh`)
-```zsh
-tmx [name]      # Attach or create session
-tmdev [name]    # Create 3-window dev layout
-tmkill          # Interactive session killer
-tmls            # List sessions
-```
-
-## Hammerspoon Architecture
-
-### Module Structure
-```
-~/.hammerspoon/
-├── init.lua             # Entry point (~80 lines)
-├── modules/
-│   ├── data.lua         # JSON persistence
-│   ├── space-labels.lua # Space naming
-│   ├── space-switcher.lua # Keyboard navigation
-│   ├── menubar.lua      # UI in menubar
-│   └── profiles.lua     # Workspace profiles
-├── workspace-notes.json # User data (not synced)
-└── space-profiles/      # Saved profiles (not synced)
-```
-
-### Module Communication
-- Modules return tables with public functions
-- Callbacks connect modules: `onLabelChanged`, `onSpaceChanged`
-- Data module handles all JSON I/O
-
-## Maintenance Patterns
-
-### Adding New Aliases
-1. Choose appropriate file in `.zsh/aliases/`
-2. Or create new topic file: `.zsh/aliases/mytopic.zsh`
-3. Run `./bootstrap.sh -f` to sync
-
-### Adding New Functions
-Add to `.zsh/functions/utils.zsh` or create topic-specific file
-
-### Adding Lazy-Loaded Tool
-Create `.zsh/tools/mytool.zsh`:
-```zsh
-mytool() {
-    unset -f mytool
-    source /path/to/init.sh
-    mytool "$@"
-}
-```
-
-### Platform-Specific Code
-```zsh
-is_mac || return 0  # Skip entire file on non-macOS
-is_mac && command   # Inline conditional
-```
-
-## Applying Changes
+## Apply changes
 
 ```bash
 cd ~/Work/dotfiles
-./bootstrap.sh -f
+./bootstrap.sh -f       # rsync to ~/, no --delete
+hs -c "hs.reload()"     # pick up Hammerspoon changes
 ```
 
-### Benchmarking
-```bash
-time zsh -i -c exit  # Single run
-for i in {1..5}; do time zsh -i -c exit; done  # Average
-```
-Target: < 100ms on modern hardware
+Bootstrap doesn't delete files in `~/` that aren't in the repo — when removing a file from the repo, also `rm -rf ~/.hammerspoon/<dir>` or equivalent.

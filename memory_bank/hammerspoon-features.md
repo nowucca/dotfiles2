@@ -1,220 +1,184 @@
-# Hammerspoon Features Documentation
+# Hammerspoon — Spaces product feature reference
 
-## Overview
-Hammerspoon provides macOS Space labeling, switching, and workspace profile management via a menubar widget and keyboard shortcuts.
+Quick reference for the Spaces v1 product (`.hammerspoon/spaces/`). For architecture see `systemPatterns.md`; for current state see `activeContext.md`.
 
-## Keyboard Shortcuts
+## Hotkeys
 
-| Shortcut | Action |
-|----------|--------|
-| `⌘⌃L` | Set label for current space |
-| `⌘⌃⇧L` | Show current label as banner |
-| `⌘⌃Space` | Open space switcher |
+| Hotkey | Action |
+|--------|--------|
+| `⌘⌃A` | **New agent space** — prompt label + cwd, create space, launch iTerm with `claude` |
+| `⌘⌃⇧A` | **New agent tab here** — pick cwd, add tab to current iTerm window with `claude` |
+| `⌘⌃L` | Show current space's label as banner |
+| `⌘⌃⇧L` | Set or update current space's label |
+| `⌘⌃Space` | Open space switcher chooser |
+| `⌘⌃N` | App launcher chooser (Chrome / iTerm) |
+| `⌘⌃B` | Open Chrome on current space |
+| `⌘⌃T` | Open iTerm on current space |
 | `⌘⌃S` | Save current space as profile |
 | `⌘⌃R` | Restore profile to current space |
-| `⌘⌃N` | Open app on current space (chooser) |
-| `⌘⌃⇧C` | Open Chrome on current space |
-| `⌘⌃T` | Open iTerm on current space |
+| `⌘⌃⇧N` | Create new space (labelled, with iTerm + Chrome) |
+| `⌘⌃⇧C` | Close current space (with confirmation) |
 
-## Menubar Widget
+## Tab-title state convention
 
-### Location
-- Shows in macOS menubar as 🏷️ icon
-- Displays current space's label (if set)
-- Cmd+drag to reposition
+Agents announce state by writing the OS title via OSC 0/2:
 
-### Menu Items
-1. **Current: [label]** - Shows current space label
-2. **Set Label...** - Open label dialog
-3. **Switch Space...** - Open space switcher
-4. **Clear Label** - Remove label from current space (if labeled)
-5. **Apply Label** - List of existing labels to apply
-6. **Delete a Label...** - Remove label from system
-7. **Prune Labels** - Remove old unused labels (7/30/90 days)
-8. **Space Profiles:**
-   - Save Space Profile...
-   - Restore Profile...
-   - Delete Profile...
-9. **Show Banner** - Display label as overlay
-10. **Debug Info** - Show screen/space information
+```
+\033]0;[spaces:STATE] FREEFORM\007
+```
 
-## Features in Detail
+States: `idle`, `run`, `wait`, `done`, `err`. Tabs without the prefix render as `idle`.
 
-### Space Labeling
-Assign human-readable names to macOS Spaces (virtual desktops).
+Shell shim auto-loaded from `~/.zsh/tools/spaces.zsh`:
 
-**Usage:**
-1. Press `⌘⌃L` or click "Set Label..." in menu
-2. Enter a label (e.g., "Development", "Email", "Slack")
-3. Label appears in menubar and space switcher
+```zsh
+spaces_state run "task name"
+spaces_state wait
+spaces_state done
+spaces_state err
+```
 
-**Notes:**
-- Labels persist across Hammerspoon reloads
-- Space IDs change on macOS restart (use "Apply Label" to re-assign)
-- Labels track "last used" timestamp for pruning
+## Menubar layout
 
-### Space Switching
-Navigate between spaces using a searchable chooser UI.
+Widget title: SF Symbol icon (when available) + current space's label + dot badge if running/waiting agent on this space. Without the SF Symbol, falls back to a `▤` text glyph.
 
-**Usage:**
-1. Press `⌘⌃Space`
-2. Type to filter by label
-3. Arrow keys to select, Enter to switch
-4. Escape to cancel
+Click opens:
 
-**Display:**
-- `→ Label` indicates current space
-- Unlabeled spaces show as "Space N"
+```
+▶ <current space>  (current)            ← inline-expanded
+   ▶ iTerm — Window 1
+       ● task title
+       ◐ another task
+         shell
+   ▶ iTerm — Window 2
+       ○ done: deploy-check
+   <other space>                        ← click to switch
+   <other space>
+─────
+New agent space…           ⌘⌃A
+New agent tab here         ⌘⌃⇧A
+─────
+Set Label…                 ⌘⌃⇧L
+New Space                  ⌘⌃⇧N
+Close Space                ⌘⌃⇧C
+─────
+Open Chrome                ⌘⌃B
+Open iTerm                 ⌘⌃T
+─────
+Profiles ▸
+Manage Labels ▸
+─────
+About Spaces…
+```
 
-### Space Profiles
-Save and restore the set of apps on a space.
+State badges in tab rows:
 
-**Save Profile:**
-1. Open apps you want on this space
-2. Press `⌘⌃S`
-3. Enter profile name (defaults to current label)
-4. Profile saves: label + list of apps
+| State | Glyph |
+|-------|-------|
+| `run` | `●` |
+| `wait` | `◐` |
+| `done` | `○` |
+| `err` | `✕` |
+| `idle` / shell | `·` |
 
-**Restore Profile:**
-1. Go to the space you want to configure
-2. Press `⌘⌃R`
-3. Select a profile from the list
-4. Apps launch and move to current space
+Click a tab row → switches to its space + focuses that tab via iTerm AppleScript.
 
-**What Gets Saved:**
-- Space label
-- List of apps with windows on space
-- App bundle IDs
-
-**What Gets Restored:**
-- Label applied to current space
-- Apps launched (staggered to avoid overload)
-- New windows moved to current space
-
-**Special Handling:**
-- **iTerm**: Creates new window via AppleScript, moves to current space
-  (This handles the case where iTerm is already open on another space)
-
-### App Launcher (Open on Current Space)
-Launch Chrome or iTerm windows that stay on the current space.
-
-**Problem Solved:**
-When you open a new Chrome or iTerm window and that app is already running on another space, macOS switches you to that space. The app launcher:
-1. Records your current space before launching
-2. Creates a new window
-3. Moves the new window to your original space
-4. Switches you back to the original space
-5. Focuses the new window
-
-**Usage:**
-- Press `⌘⌃N` to show chooser (Chrome or iTerm)
-- Press `⌘⌃⇧C` for Chrome directly
-- Press `⌘⌃T` for iTerm directly
-
-**How It Works:**
-1. Captures current space ID before any action
-2. Uses AppleScript to create new window (ensures new window, not focus)
-3. Polls for the new window to appear (up to 2 seconds)
-4. Moves new window to original space via hs.spaces.moveWindowToSpace
-5. Switches back to original space
-6. Focuses the new window
-
-### Label Management
-
-**Prune Labels:**
-Remove labels not used for N days
-- 7 days - aggressive cleanup
-- 30 days - moderate cleanup
-- 90 days - conservative cleanup
-
-**Delete Label:**
-Removes specific label from the system
-- Also clears the label from any spaces using it
-
-## Console Access (Debugging)
-
-Access modules via the `ws` global in Hammerspoon console:
+## Console debug namespace
 
 ```lua
--- Get current label
-ws.labels.getCurrentLabel()
-
--- List apps on current space
-for _, app in ipairs(ws.profiles.getAppsOnCurrentSpace()) do
-  print(app.name)
-end
-
--- List saved profiles
-for _, p in ipairs(ws.profiles.listProfiles()) do
-  print(p.name, #p.apps .. " apps")
-end
-
--- Manually save profile
-ws.profiles.saveCurrentSpace("MyProfile")
-
--- Reload menubar
-ws.menubar.update()
+_G.ws.spaces.config        -- brand, paths, poll cadence
+_G.ws.spaces.log           -- log.info/debug/warn/error/try
+_G.ws.spaces.agents        -- summary(), forSpace(sid), get(s,w,t)
+_G.ws.spaces.iterm         -- snapshot(), snapshotAsync(cb), newWindow, newTab, focusTab
+_G.ws.spaces.labels        -- getCurrentLabel, set, clear, prune, rebind
+_G.ws.spaces.switcher      -- getSpacesForCurrentScreen, gotoSpace, show
+_G.ws.spaces.banner        -- show
+_G.ws.spaces.manager       -- createNewSpace, confirmCloseCurrentSpace
+_G.ws.spaces.profiles      -- saveCurrentSpace, restoreProfile, listProfiles
+_G.ws.spaces.launcher      -- newAgentSpace, newAgentTabHere, openChrome, openITerm
+_G.ws.spaces.menubar       -- widget control, update()
 ```
 
-## File Locations
+Useful queries:
 
-### Code (version controlled)
-```
-~/Work/dotfiles/.hammerspoon/
-├── init.lua
-└── modules/
-    ├── app-launcher.lua
-    ├── data.lua
-    ├── space-labels.lua
-    ├── space-switcher.lua
-    ├── menubar.lua
-    └── profiles.lua
-```
+```lua
+-- What's the agent state map look like?
+_G.ws.spaces.agents.summary()
+-- → { run = N, wait = N, done = N, err = N, idle = N }
 
-### Data (not version controlled)
-```
-~/.hammerspoon/
-├── workspace-notes.json    # Labels and space assignments
-└── space-profiles/         # Saved profiles
-    ├── Development.json
-    └── Email.json
+-- All agents on the current space
+local sid = _G.ws.spaces.agents.summary  -- placeholder; use snippet below
+hs.fnutils.imap(_G.ws.spaces.agents.forSpace(sid), function(r)
+  return r.title .. " [" .. r.state .. "]"
+end)
+
+-- Force a snapshot synchronously (for one-off inspection)
+local s = _G.ws.spaces.iterm.snapshot()
+print(#s.windows .. " windows")
+
+-- Reload menubar title
+_G.ws.spaces.menubar.update()
 ```
 
-## Development Workflow
+## File data
 
-### Quick Commands
-```bash
-hsed    # cd to hammerspoon dotfiles
-hsr     # sync and reload
-hsr!    # reload only (no sync)
-hss     # sync only (no reload)
-hsc     # run hammerspoon command
+User data lives in `~/.hammerspoon/` and is **not** synced from the repo:
+
+- `workspace-notes.json` — labels, space → label mapping, agent cwd recents (LRU, max 10)
+- `space-profiles/<name>.json` — saved profiles (one per file)
+
+Schema for `workspace-notes.json`:
+
+```json
+{
+  "labels":   { "Spinnaker": { "lastUsed": 1746728000 }, ... },
+  "spaces":   { "12345": "Spinnaker", ... },
+  "agentCwds": ["/Users/.../Work/...", "..."]
+}
 ```
 
-### Making Changes
-1. `hsed` - go to dotfiles hammerspoon dir
-2. Edit files in your editor
-3. `hsr` - sync to ~/.hammerspoon and reload
-4. Test changes
-5. Commit to git
+## Common operations
+
+### Add an existing agent space to the menubar
+
+Just label the space (`⌘⌃⇧L`). Agent state appears automatically once the agent starts emitting `[spaces:run] ...` titles.
+
+### Disable agent polling temporarily
+
+```lua
+_G.ws.spaces.agents.stop()
+-- ... do stuff ...
+_G.ws.spaces.agents.start()
+```
+
+### Tune polling cadence
+
+Edit `core/config.lua` `poll.foregroundSec` / `poll.backgroundSec`, then `./bootstrap.sh -f && hs -c "hs.reload()"`.
+
+### Diagnose slow menu
+
+Time the build path:
+
+```lua
+local t0 = hs.timer.absoluteTime()
+_G.ws.spaces.menubar.update()
+print(string.format("%.1f ms", (hs.timer.absoluteTime() - t0) / 1e6))
+```
 
 ## Troubleshooting
 
-### Labels not showing after restart
-Space IDs change when macOS restarts. Use "Apply Label" from the menu to re-assign labels to spaces.
+| Symptom | Check |
+|---------|-------|
+| Menubar widget invisible | SF Symbol failed to load AND no label — fallback glyph should appear; if not, check the title-building code paths |
+| Menu opens slowly | `iterm.snapshot()` (sync) called on the build path? It shouldn't be — see `systemPatterns.md` async pattern |
+| Agent state doesn't update | Polling stopped? Run `_G.ws.spaces.agents.summary()` and confirm non-zero counts; check `agents.start()` was called |
+| Wrong space label briefly shown after switch | Space-watcher fires before focus settles; 200ms `timer.doAfter` delay is in place |
+| Tab title overwritten by shell | iTerm's shell integration sets the title on every prompt; emit your OSC escape from inside the shell instead of via `set name` |
 
-### Module not found error
-Check that `hsr` was run to sync files. Check Hammerspoon console for specific error.
+## Changes from the old `modules/` layout (deleted in v1)
 
-### Menubar not updating
-Try `ws.menubar.update()` in console, or run `hsr!` to reload.
-
-### Profile restore not working
-- Check console for errors
-- Ensure apps are installed
-- Some apps may not create windows immediately
-
-### iTerm appearing on wrong space
-The profile system creates new iTerm windows via AppleScript and moves them. If this fails, check:
-- iTerm accessibility permissions
-- Console for AppleScript errors
+- `modules/` folder gone; product lives in `spaces/{core,ui,actions}/`.
+- Five duplicate `findAndMoveNewWindow*` loops collapsed into `core/iterm.lua` and `core/chrome.lua`.
+- Console namespace moved from flat `ws.labels` etc. to `ws.spaces.<module>`.
+- `ws.menubar.update()` → `_G.ws.spaces.menubar.update()`.
+- All `print()` debug chatter routed through `core/log.lua` (default level info).
