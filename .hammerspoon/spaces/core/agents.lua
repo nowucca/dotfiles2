@@ -83,8 +83,12 @@ end
 
 local function refresh()
   if not itermModule then itermModule = require("core.iterm") end
-  local ok, snap = log.try(function() return itermModule.snapshot() end, "agents.refresh snapshot")
-  if ok and snap then M._refreshFromSnapshot(snap) end
+  -- Async so the AppleScript snapshot doesn't block the main thread.
+  itermModule.snapshotAsync(function(snap)
+    if snap then
+      log.try(function() M._refreshFromSnapshot(snap) end, "agents.refresh apply")
+    end
+  end)
 end
 
 function M.start()
