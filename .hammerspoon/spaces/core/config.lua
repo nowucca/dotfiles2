@@ -11,8 +11,13 @@ return {
     profiles = hs.configdir .. "/space-profiles",
   },
   poll = {
-    foregroundSec = 2,
-    backgroundSec = 10,
+    -- Synchronous AppleScript snapshot blocks the main thread for tens to
+    -- hundreds of ms when many iTerm tabs are open. Aggressive polling can
+    -- make UI elements (chooser, menubar) feel unresponsive while a snapshot
+    -- is in flight. Conservative defaults; tune down only if state lag is
+    -- actually noticeable.
+    foregroundSec = 5,
+    backgroundSec = 30,
   },
   alert = {
     textColor = { hex = "#e6e6e6" },

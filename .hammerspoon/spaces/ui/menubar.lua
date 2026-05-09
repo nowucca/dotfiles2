@@ -46,6 +46,11 @@ M._spaceWatcher = nil
 M._screenWatcher = nil
 M._winFilter = nil
 
+-- Fallback glyph used in the title when the SF Symbol image fails to load.
+-- Without this the widget can render with no icon AND empty title (no label
+-- on current space) which makes it invisible in the menubar.
+local FALLBACK_GLYPH = "▤"
+
 local function brandImage()
   local img = image.imageFromName("symbol://" .. config.brand.glyph)
   if img then img:setSize({ w = 18, h = 18 }) ; img:template(true) end
@@ -64,7 +69,6 @@ local function updateTitle()
   if not M._widget then return end
   local sid = currentSpaceId()
   local label = labels.getCurrentLabel()
-  local title = label or ""
 
   -- Current-space agent badge: prefer run, then wait, else nothing.
   local badge = ""
@@ -79,11 +83,17 @@ local function updateTitle()
     elseif hasWait then badge = " ◐" end
   end
 
-  if title == "" and badge == "" then
-    M._widget:setTitle("")
+  -- Always render *something* in the title. If the SF Symbol icon loaded
+  -- successfully the icon is the visual identity and the title can be the
+  -- label alone (or empty). If the icon didn't load, the title carries the
+  -- glyph so the widget remains visible. M._iconLoaded is set in start().
+  local title
+  if label then
+    title = (M._iconLoaded and label or (FALLBACK_GLYPH .. " " .. label)) .. badge
   else
-    M._widget:setTitle(title .. badge)
+    title = M._iconLoaded and badge or (FALLBACK_GLYPH .. badge)
   end
+  M._widget:setTitle(title)
 end
 
 -- Build a clickable row for a single iTerm tab. Walks the live snapshot
@@ -187,8 +197,12 @@ function M.start()
   if not M._widget then log.error("menubar: hs.menubar.new returned nil"); return end
 
   local img = brandImage()
-  if img then M._widget:setIcon(img)
-  else log.warn("menubar: SF Symbol unavailable, using text-only title") end
+  M._iconLoaded = (img ~= nil)
+  if img then
+    M._widget:setIcon(img)
+  else
+    log.warn("menubar: SF Symbol unavailable, using glyph fallback in title")
+  end
 
   M._widget:setMenu(buildMenu)
   updateTitle()
@@ -199,7 +213,11 @@ function M.start()
   launcher.onWindowLaunched = updateTitle
   agents.onChange = updateTitle
 
-  M._spaceWatcher = spacesMod.watcher.new(function() updateTitle() end)
+  -- Defer space-watcher updates so macOS has settled before we read the
+  -- focused window's screen → active space (which can lag the actual switch).
+  M._spaceWatcher = spacesMod.watcher.new(function()
+    timer.doAfter(0.2, updateTitle)
+  end)
   M._spaceWatcher:start()
 
   M._screenWatcher = screenMod.watcher.new(function()
@@ -207,15 +225,16 @@ function M.start()
   end)
   M._screenWatcher:start()
 
-  M._winFilter = windowMod.filter.new()
-  M._winFilter:subscribe(windowMod.filter.windowFocused, function() updateTitle() end)
+  -- Note: we deliberately do NOT subscribe to hs.window.filter.windowFocused
+  -- here. That filter watches every window event in the system and adds
+  -- significant load — and the spaces watcher already covers space changes,
+  -- which is what affects the widget title.
 end
 
 function M.stop()
   if M._widget then M._widget:delete(); M._widget = nil end
   if M._spaceWatcher then M._spaceWatcher:stop(); M._spaceWatcher = nil end
   if M._screenWatcher then M._screenWatcher:stop(); M._screenWatcher = nil end
-  if M._winFilter then M._winFilter:unsubscribeAll(); M._winFilter = nil end
   labels.onLabelChanged = nil
   switcher.onSpaceChanged = nil
   launcher.onWindowLaunched = nil
