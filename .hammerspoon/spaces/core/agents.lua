@@ -65,6 +65,7 @@ function M._refreshFromSnapshot(snap)
       local prev = map[k]
       local rec = {
         spaceId = w.space, winId = w.id, tabId = t.id,
+        tabIndex = t.index,
         state = parsed.state, title = parsed.title,
         changedAt = (prev and prev.state == parsed.state) and prev.changedAt or os.time(),
       }

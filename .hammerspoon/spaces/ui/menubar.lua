@@ -96,14 +96,14 @@ local function updateTitle()
   M._widget:setTitle(title)
 end
 
--- Build a clickable row for a single iTerm tab. Walks the live snapshot
--- entry to get index (for focus) plus the parsed agent state (for badge).
-local function tabRow(winId, tab, spaceId)
-  local rec = agents.get(spaceId, winId, tab.id) or { state = "idle", title = tab.title }
+-- Build a clickable row for a single agent state record. The record's
+-- tabIndex is what iterm.focusTab needs (1-based AppleScript index); the
+-- record's tabId (session UUID) isn't used for focus.
+local function tabRow(rec)
   local glyph = STATE_GLYPHS[rec.state] or ""
   local subject = rec.title ~= "" and rec.title or "(shell)"
   local prefix = (glyph ~= "" and glyph or "·") .. "  "
-  local idx = tab.index
+  local winId, idx = rec.winId, rec.tabIndex
   return {
     title = "      " .. prefix .. subject,
     fn = function()
@@ -112,25 +112,35 @@ local function tabRow(winId, tab, spaceId)
   }
 end
 
+-- Build the space section using ONLY cached state. We must NOT call
+-- iterm.snapshot() here — it runs synchronous AppleScript over every iTerm
+-- window/tab and can take hundreds of ms. The agent state map has been
+-- refreshed by the polling timer; using it makes menu open instant.
 local function buildSpaceSection()
   local out = {}
   local sid = currentSpaceId()
   local switcherItems = switcher.getSpacesForCurrentScreen()
-  local snap = iterm.snapshot()
 
   for _, info in ipairs(switcherItems) do
     local title = info.label or ("Space " .. info.index)
     if info.isActive then
       table.insert(out, { title = "▶ " .. title .. "  (current)", disabled = true })
-      -- Iterate windows on this space, group tabs by window.
-      local winNum = 0
-      for _, w in ipairs(snap.windows) do
-        if w.space == sid then
-          winNum = winNum + 1
-          table.insert(out, { title = "   ▶ iTerm — Window " .. winNum, disabled = true })
-          for _, t in ipairs(w.tabs) do
-            table.insert(out, tabRow(w.id, t, sid))
-          end
+
+      -- Group cached agent records on this space by winId.
+      local recsByWin = {}
+      local winOrder = {}
+      for _, rec in ipairs(agents.forSpace(sid)) do
+        if not recsByWin[rec.winId] then
+          recsByWin[rec.winId] = {}
+          table.insert(winOrder, rec.winId)
+        end
+        table.insert(recsByWin[rec.winId], rec)
+      end
+
+      for i, wid in ipairs(winOrder) do
+        table.insert(out, { title = "   ▶ iTerm — Window " .. i, disabled = true })
+        for _, rec in ipairs(recsByWin[wid]) do
+          table.insert(out, tabRow(rec))
         end
       end
     else

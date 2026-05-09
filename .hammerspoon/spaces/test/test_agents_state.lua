@@ -6,11 +6,11 @@ local agents = require("core.agents")
 local fake = {
   windows = {
     { id = 100, space = 1, tabs = {
-      { id = 1001, title = "[spaces:run] task-a", isProcessing = true },
-      { id = 1002, title = "shell", isProcessing = false },
+      { id = 1001, index = 1, title = "[spaces:run] task-a", isProcessing = true },
+      { id = 1002, index = 2, title = "shell", isProcessing = false },
     }},
     { id = 101, space = 2, tabs = {
-      { id = 1003, title = "[spaces:done]", isProcessing = false },
+      { id = 1003, index = 1, title = "[spaces:done]", isProcessing = false },
     }},
   },
 }
@@ -29,6 +29,7 @@ h.assert_eq(s.err, 0, "summary err")
 local rec = agents.get(1, 100, 1001)
 h.assert_eq(rec.state, "run", "tab 1001 state")
 h.assert_eq(rec.title, "task-a", "tab 1001 title")
+h.assert_eq(rec.tabIndex, 1, "tab 1001 tabIndex carried through")
 
 -- Second refresh with a state change should fire onChange.
 fake.windows[1].tabs[1].title = "[spaces:done] task-a"
