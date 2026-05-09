@@ -24,8 +24,13 @@ local function validateAndClean(d)
       if type(value) == "table" and type(value.lastUsed) == "number" then
         cleanLabels[key] = value
       elseif type(value) == "string" and tonumber(key) then
-        -- Misplaced space->label mapping. Lift it into spaces.
+        -- Misplaced space->label mapping. Lift it into spaces and ensure
+        -- the label has its own entry too — without this the lifted space
+        -- references a label that won't appear in getAllLabels().
         cleanSpaces[key] = value
+        if not cleanLabels[value] then
+          cleanLabels[value] = { lastUsed = os.time() }
+        end
       end
     end
   end

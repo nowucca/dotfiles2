@@ -11,6 +11,17 @@ h.assert_nil(cleaned.labels.Bad, "bad label dropped")
 h.assert_eq(cleaned.spaces["123"], "Foo", "good space kept")
 h.assert_nil(cleaned.spaces["456"], "table-valued space dropped")
 
+-- Lifted-entry case: a numeric-keyed string in `labels` is a misplaced
+-- space->label mapping. After lifting into `spaces`, the label name itself
+-- must also have an entry in `labels` so getAllLabels() will surface it.
+local lifted = data._validateAndClean({
+  labels = { ["77"] = "Lifted" },
+  spaces = {},
+})
+h.assert_eq(lifted.spaces["77"], "Lifted", "lifted entry placed in spaces")
+h.assert_true(type(lifted.labels.Lifted) == "table", "lifted label entry created")
+h.assert_true(lifted.labels.Lifted.lastUsed > 0, "lifted label has lastUsed")
+
 -- agentCwds: prepended on add, capped at 10, deduped.
 local d = { agentCwds = { "/a", "/b", "/c" } }
 data.pushAgentCwd(d, "/b")  -- already present, moves to front
