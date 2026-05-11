@@ -1,0 +1,1 @@
+Use ./bootstrap.sh -f to publish all files to home folder for testing.

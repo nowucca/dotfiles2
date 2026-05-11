@@ -1,3 +1,10 @@
+##### BEGIN METATRON AUTOCONFIG
+# Do not remove the above line. The metatron CLI uses it to update this file.
+# Set git proxy configuration (must be the first directive in this file)
+[include]
+    path = /Users/satkinson/.gitconfig-proxy
+# Do not remove the below line. The metatron CLI uses it to update this file.
+##### END METATRON AUTOCONFIG
 [alias]
 
 	# View abbreviated SHA, description, and history graph of the latest 20 commits
@@ -209,6 +216,7 @@
 	default = simple
 	# Make `git push` push relevant annotated tags when pushing branches out.
 	followTags = true
+	autoSetupRemote = true
 
 # URL shorthands
 
@@ -235,3 +243,47 @@
 [init]
 
 	templateDir = ~/.config/git/template/
+[user]
+	email = satkinson@netflix.com
+	name = Steven Atkinson
+
+[http "https://stash.prod.netflix.net:7006"]
+
+  sslCert = ~/.metatron/user.crt
+
+  sslKey = ~/.metatron/user.key
+
+  sslVerify = true
+
+
+
+[url "https://stash.prod.netflix.net:7006/scm"]
+
+  insteadOf = ssh://git@stash.corp.netflix.com:7999
+
+
+
+[url "https://stash.prod.netflix.net:7006"]
+
+  insteadOf = https://stash.corp.netflix.com
+
+
+
+[url "https://stash.prod.netflix.net:7006"]
+
+  insteadOf = https://stash.corp.netflix.com:7006
+
+
+
+[url "https://stash.prod.netflix.net:7006"]
+
+  insteadOf = https://stash.corp.netflix.com:7004
+[http "https://git.test.netflix.net"]
+    sslCert = ~/.metatron/user.crt
+    sslKey = ~/.metatron/user.key
+    sslVerify = true
+
+[http "https://git.staging.netflix.net"]
+    sslCert = ~/.metatron/user.crt
+    sslKey = ~/.metatron/user.key
+    sslVerify = true

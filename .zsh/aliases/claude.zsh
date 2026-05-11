@@ -8,3 +8,7 @@ alias clauded='claude --dangerously-skip-permissions'
 
 # Resume a previous Claude session with dangerous permissions
 alias claudedr='claude --dangerously-skip-permissions --resume'
+
+alias cc=clauded
+
+alias cr=claudedr

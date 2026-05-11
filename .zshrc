@@ -75,3 +75,5 @@ unset _zsh_dir
 # alias zshtime='for i in {1..5}; do time zsh -i -c exit; done'
 
 # Quick benchmark: time zsh -i -c exit
+
+eval "$(command ctx-lenses setup zsh)"
