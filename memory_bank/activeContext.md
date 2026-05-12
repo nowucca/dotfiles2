@@ -28,14 +28,21 @@ For dotfiles-side patterns (zsh modules, lazy loading, host setup, ctx-lenses in
 
 For Spaces product patterns (architecture, async AppleScript, iTerm quirks, module conventions), see `~/spaces/hs-spaces/hs-spaces/main/memory_bank/systemPatterns.md`.
 
+## Recent dotfiles-side activity
+
+### 2026-05-10: Picked up accumulated machine + tooling config
+
+Cleared a backlog of unstaged changes (`6350bf8`): `.gitconfig` Metatron auto-config + Netflix stash SSL certs + `push.autoSetupRemote`; `.zsh/aliases/claude.zsh` `cc`/`cr` shortcuts; `.zsh/tools/ctx.zsh` ctx-lenses sourcing (auto-picked by the `.zsh/tools/*.zsh` loop); `CLAUDE.md` repo-level deploy reminder.
+
+Pushed to both remotes: `origin` (`github.com/nowucca/dotfiles2`) and `netflix` (`git.netflix.net/corp/satkinson-dotfiles`).
+
 ## Open items
 
-- Push `hs-spaces` repo to Netflix GHE (target host for the new repo).
-- v1.5 Spaces work: manuals v2 site (`<hs-spaces>/manual/`), installable Claude skill (`<hs-spaces>/skill/`).
-- Push dotfiles to remote (currently 30+ commits ahead of `origin/main-zsh`).
+- Nothing dotfiles-side. v1.6 Spaces work continues in the hs-spaces repo (per-space dashboard surfaces in the Spaces window).
 
 ## Quick references
 
-- Hammerspoon product (Spaces): `~/spaces/hs-spaces/hs-spaces/main/`
+- Hammerspoon product (Spaces): `~/spaces/hs-spaces/hs-spaces/main/` → `github.netflix.net/satkinson/hs-spaces`
 - Spaces design history (kept here for archival): `docs/superpowers/{specs,plans}/`
-- Branch: `main-zsh`. Ahead of origin by 30+ commits as of latest push.
+- Branch: `main-zsh`. Pushed to both `origin` and `netflix` remotes; sync via `git push origin main-zsh && git push netflix main-zsh`.
+- Dotfiles deploys to `~/` via `./bootstrap.sh -f` (rsync without `--delete` — see systemPatterns.md gotcha).
