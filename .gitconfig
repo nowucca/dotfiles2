@@ -242,7 +242,14 @@
 
 [init]
 
-	templateDir = ~/.config/git/template/
+	# Use init.defaultBranch instead of a template directory. The template HEAD
+	# approach is unsafe: workspace bootstrap installs templates via symlink,
+	# and `git clone` (a) preserves symlinks when copying templates into the
+	# new .git/, then (b) writes "ref: refs/heads/.invalid" as a sentinel into
+	# the new repo's HEAD before resolving the remote default. That write
+	# travels back through the symlink and corrupts the dotfiles source,
+	# leaving every subsequent clone broken.
+	defaultBranch = main
 [user]
 	email = satkinson@netflix.com
 	name = Steven Atkinson

@@ -78,6 +78,18 @@ unset _zsh_dir
 
 eval "$(command ctx-lenses setup zsh)"
 
+#=============================================================================
+# Defensive: clear init.templateDir
+#=============================================================================
+# Workspace bootstrap can install a template HEAD via symlink to the dotfiles
+# source file. `git clone` (a) preserves symlinks when copying templates and
+# then (b) writes "ref: refs/heads/.invalid" into the new repo's HEAD as a
+# sentinel before resolving the remote default. That write transits the
+# symlink and corrupts the dotfiles source, breaking every subsequent clone.
+# Unset init.templateDir on every shell start so stale configs can't bite.
+git config --file ~/.config/git/config --unset init.templateDir 2>/dev/null || true
+git config --file ~/.gitconfig --unset init.templateDir 2>/dev/null || true
+
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="/home/coder/.sdkman"
 [[ -s "/home/coder/.sdkman/bin/sdkman-init.sh" ]] && source "/home/coder/.sdkman/bin/sdkman-init.sh"
