@@ -23,6 +23,22 @@ is_linux() { [[ "$(uname)" == "Linux" ]]; }
 is_mac() { [[ "$(uname -s)" == "Darwin" ]]; }
 
 #=============================================================================
+# Defensive: clear init.templateDir (must run before any tool that clones)
+#=============================================================================
+# Workspace bootstrap can install ~/.config/git/template/HEAD as a symlink
+# to the dotfiles source file. `git clone` (a) preserves symlinks when
+# copying templates and then (b) writes "ref: refs/heads/.invalid" into the
+# new repo's HEAD as a sentinel before resolving the remote default. That
+# write transits the symlink and corrupts the dotfiles source, breaking
+# every subsequent clone.
+#
+# This unset has to run BEFORE the tools loop below — nvm.zsh in particular
+# will git-clone nvm into ~/.nvm on first shell startup, which trips the
+# trap before any later defensive code could help.
+git config --file ~/.config/git/config --unset init.templateDir 2>/dev/null || true
+git config --file ~/.gitconfig --unset init.templateDir 2>/dev/null || true
+
+#=============================================================================
 # Module Loading
 #=============================================================================
 
