@@ -92,8 +92,6 @@ unset _zsh_dir
 
 # Quick benchmark: time zsh -i -c exit
 
-eval "$(command ctx-lenses setup zsh)"
-
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="/home/coder/.sdkman"
 [[ -s "/home/coder/.sdkman/bin/sdkman-init.sh" ]] && source "/home/coder/.sdkman/bin/sdkman-init.sh"

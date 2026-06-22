@@ -5,8 +5,8 @@
 
 export NVM_DIR="$HOME/.nvm"
 
-# Install NVM if not present (silenced — errors still surface via stderr)
-[ ! -d "$NVM_DIR" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/refs/heads/master/install.sh | bash > /dev/null
+# Install NVM if not present (fully silenced — it's a one-time workspace setup)
+[ ! -d "$NVM_DIR" ] && curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/refs/heads/master/install.sh | bash > /dev/null 2>&1
 
 # Lazy-load NVM - only initializes when you first use nvm, node, npm, or npx
 # Each wrapper unsets ALL wrappers first, loads nvm, then calls the real command.
