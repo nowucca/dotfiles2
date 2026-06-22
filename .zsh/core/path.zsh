@@ -6,6 +6,10 @@
 # Start with a clean, explicit base PATH
 export PATH="$HOME/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
+# Netflix paths — present on both macOS and Linux workspaces
+[[ -d /opt/nflx/bin ]] && export PATH="/opt/nflx/bin:$PATH"
+[[ -d /opt/nflx ]] && export PATH="/opt/nflx:$PATH"
+
 # macOS/Homebrew paths (hardcoded for performance - avoids slow `eval "$(brew shellenv)"`)
 if is_mac; then
     export HOMEBREW_PREFIX="/opt/homebrew"
@@ -14,10 +18,7 @@ if is_mac; then
     export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
     export MANPATH="/opt/homebrew/share/man${MANPATH+:$MANPATH}:"
     export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
-    
-    # Netflix paths (if available)
-    [[ -d /opt/nflx ]] && export PATH="$PATH:/opt/nflx:/opt/nflx/bin"
-    
+
     # kubectl
     [[ -d "$HOME/.kube/bin" ]] && export PATH="$HOME/.kube/bin:$PATH"
 fi
