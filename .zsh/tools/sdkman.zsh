@@ -5,8 +5,8 @@
 
 export SDKMAN_DIR="${HOME}/.sdkman"
 
-# Install SDKMAN! if not present
-[[ -r ${SDKMAN_DIR} ]] || curl -s "https://get.sdkman.io" | bash
+# Install SDKMAN! if not present (silenced — errors still surface via stderr)
+[[ -r ${SDKMAN_DIR} ]] || curl -fsSL "https://get.sdkman.io" | bash > /dev/null
 
 # Lazy-load SDKMAN - only initializes when you use the sdk command
 sdk() {
