@@ -42,6 +42,21 @@ alias worklist='work list --column "workspace,status,starts at,stops after"'
 alias workssh='work ssh'
 alias workcreate='work create'
 
+# Create a Change Confidence workspace off main with 32 CPU / 128 GB
+# Usage: work-create-cc [workspace-name]
+#   workspace-name defaults to "change-confidence-main"
+function work-create-cc() {
+  local name="${1:-change-confidence-main}"
+  work create \
+    --template workspace-v1 \
+    --parameter "git_repo=https://git.netflix.net/corp/change-confidence-dev-workspace.git" \
+    --parameter "git_branch=main" \
+    --parameter "instance_size=m7a.8xlarge" \
+    --use-parameter-defaults \
+    --yes \
+    "$name"
+}
+
 # AWS/Weep aliases
 alias awsdbtest_asapp="weep file --force arn:aws:iam::179727101194:role/platformserviceInstanceProfile -A arn:aws:iam::521597827845:role/PlatformserviceDynamodbRole"
 alias awsdbprod_asapp="weep file --force arn:aws:iam::149510111645:role/platformserviceInstanceProfile -A arn:aws:iam::567395257996:role/PlatformserviceDynamodbRole"
