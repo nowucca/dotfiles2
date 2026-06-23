@@ -51,7 +51,8 @@ function work-create-cc() {
     --template workspace-v1 \
     --parameter "git_repo=https://git.netflix.net/corp/change-confidence-dev-workspace.git" \
     --parameter "git_branch=main" \
-    --parameter "instance_size=m7a.8xlarge" \
+    --parameter "instance_size=32cpu128gb" \
+    --parameter "snapshot_id=" \
     --use-parameter-defaults \
     --yes \
     "$name"
