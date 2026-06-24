@@ -83,6 +83,9 @@ unset _zsh_dir
 # ~/.extra can be used for settings you don't want to commit
 [[ -f ~/.extra ]] && source ~/.extra
 
+# Aimee status + key commands (sourced from aimee config repo if present)
+[[ -f ~/.aimee/motd.sh ]] && source ~/.aimee/motd.sh
+
 #=============================================================================
 # Startup Benchmarking
 #=============================================================================
