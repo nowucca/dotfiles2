@@ -202,5 +202,8 @@ brew install bazel
 # Graphite
 brew install withgraphite/tap/graphite
 
+# Google Workspace CLI
+npm install -g @googleworkspace/cli
+
 # Remove outdated versions from the cellar.
 brew cleanup

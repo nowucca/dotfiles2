@@ -6,6 +6,9 @@
 # Start with a clean, explicit base PATH
 export PATH="$HOME/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
 
+# ~/.local/bin — uv tools (aimee, etc.) install here on Linux workspaces
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
 # Netflix paths — present on both macOS and Linux workspaces
 [[ -d /opt/nflx/bin ]] && export PATH="/opt/nflx/bin:$PATH"
 [[ -d /opt/nflx ]] && export PATH="/opt/nflx:$PATH"
