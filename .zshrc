@@ -83,6 +83,9 @@ unset _zsh_dir
 # ~/.extra can be used for settings you don't want to commit
 [[ -f ~/.extra ]] && source ~/.extra
 
+# Aimee status + key commands (sourced from aimee config repo if present)
+[[ -f ~/.aimee/motd.sh ]] && source ~/.aimee/motd.sh
+
 #=============================================================================
 # Startup Benchmarking
 #=============================================================================
@@ -95,3 +98,7 @@ unset _zsh_dir
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="/home/coder/.sdkman"
 [[ -s "/home/coder/.sdkman/bin/sdkman-init.sh" ]] && source "/home/coder/.sdkman/bin/sdkman-init.sh"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
