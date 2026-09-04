@@ -3,6 +3,10 @@
 # Completion system configuration - optimized for startup speed
 #
 
+# Interactive shells launched without a terminal cannot use completion. Avoid
+# unnecessary initialization and credential-file probes in agent subprocesses.
+[[ -t 0 && -t 1 ]] || return 0
+
 if is_mac; then
     # Add local completion scripts to FPATH
     fpath=(~/.local/share/zsh/site-functions $fpath)
